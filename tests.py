@@ -1,8 +1,16 @@
 import numpy as np
+import images
 import instrument
+import process
+import analysis
 
 def update_D_test(p = False):
     """ Test to verify whether the 'update_D' from instrument.py works correctly. """
+
+
+    #TODO 
+    """Fix for current setup"""
+
 
     test_i = instrument.interferometer(2, .6, 1, 1, 1, .5)
 
@@ -30,6 +38,10 @@ def update_D_test(p = False):
 
 def wobbler_test(wobble_I, p = False):
     """ Test for the wobbler() function in instrument.py. """
+
+    #TODO 
+    """Fix for current setup"""
+
     test_i = instrument.interferometer(2, .6, 1, 1, 1, .5)
     test_i.wobbler(wobble_I)
 
@@ -48,4 +60,5 @@ def wobbler_test(wobble_I, p = False):
 
 if __name__ == "__main__":
     # update_D_test(True)
-    wobbler_test(.005, True)
+    # wobbler_test(.005, True)
+    print(np.zeros((1,2)))
