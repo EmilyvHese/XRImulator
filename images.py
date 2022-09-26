@@ -29,11 +29,41 @@ class image():
 
 #TODO add image generators (after full image data types and such are figured out.) 
 
-def point_source(size, theta, phi, energy):
+def point_source(size, alpha, beta, energy):
+    """
+    Function that generates an image of a monochromatic point source according to some specifications.
+
+    Parameters:
+
+    size (int) = number of photons to generate from this source.\n
+    alpha (float) = coordinate offset from zero pointing in x-direction (arcsec)\n
+    beta (float) = coordinate offset from zero pointing in y-direction (arcsec)\n
+    energy (float) = energy of photons to generate (KeV)\n
+    """
     im = image(size)
-    im.energies[:] = energy
-    im.loc[:] = np.array([theta, phi])
+    im.energies[:] = energy * 1.602177733e-16
+    im.loc[:] = np.array([alpha, beta]) * 2 * np.pi / (3600 * 360)
     im.toa = np.array([i for i in range(size)])
+
+    return im
+
+def double_point_source(size, alpha, beta, energy):
+    """
+    Function that generates an image of two monochromatic point sources according to some specifications.
+
+    Parameters:
+
+    size (int) = number of photons to generate from the sources.\n
+    alpha (list-like of floats) = coordinate offsets from zero pointing in x-direction (arcsec)\n
+    beta (list-like of floats) = coordinate offsets from zero pointing in y-direction (arcsec)\n
+    energy (list-like of floats) = energies of photons to generate (KeV)\n
+    """
+    im = image(size)
+    for i in range(size):
+        source = np.random.randint(0,2)
+        im.energies[i] = energy[source] * 1.602177733e-16
+        im.loc[i] = np.array([alpha[source], beta[source]]) * 2 * np.pi / (3600 * 360)
+        im.toa[i] = i
 
     return im
 

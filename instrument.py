@@ -14,14 +14,14 @@ class baseline():
         """ 
         Function that generates a single x-ray interferometer baseline according to given specifications.
         
-        Parameters:
-        D (float) = Baseline of the interferometer (in meters)
-        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)
-        L (float) = Length from last mirror to CCD surface (in meters)
-        W (float) = incident photon beam width (in micrometers)
-    	F (float) = effective focal length of interferometer (in meters)
-        theta_g (float) = grazing incidence angle of mirrors (in degrees)
-        length (float) = length of mirrors, needed to define collecting area (in meters)
+        Parameters:\n
+        D (float) = Baseline of the interferometer (in meters)\n
+        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)\n
+        L (float) = Length from last mirror to CCD surface (in meters)\n
+        W (float) = incident photon beam width (in micrometers)\n
+    	F (float) = effective focal length of interferometer (in meters)\n
+        theta_g (float) = grazing incidence angle of mirrors (in degrees)\n
+        length (float) = length of mirrors, needed to define collecting area (in meters)\n
         #TODO add more relevant parameters
         """
         # Converting all input parameters into self.parameters in SI units.
@@ -59,27 +59,18 @@ class interferometer():
         #TODO add more relevant parameters
         """
 
-        # # Converting all input parameters into self.parameters in SI units.
-        # self.D = D
-        # self.D_varspeed = D_varspeed
-        # self.L = L
-        # self.W = W * 10**-6
-        # self.F = F
-        # self.theta_g = theta_g * 2 * np.pi / 360
-
-        # # Calculating some more relevant parameters for ease of access.
-        # self.theta_b = D / (2 * F)
-
         # # Setting target values for changeable parameters
         # # These are necessary to track their changes over time
         # self.target_D = D
 
         self.baselines = []
 
-
         # Pointing directions, starting at 0 (straight at whatever is to be observed)
-        self.theta = 0.
-        self.phi = 0.
+        self.pointing = np.zeros(2)
+
+        # Roll direction, to support filling out entire u,v plane
+        # Standard is pi/2 since the default axis of measurement in literature is the y-axis
+        self.roll = 0
 
     def update_D(self):
         """ Function that updates the baseline towards the target baseline on a single timestep. """
@@ -102,14 +93,13 @@ class interferometer():
 
         Parameters:
 
-        Instrument (interferometer class object): instrument to offset.
+        Instrument (interferometer class object): instrument to offset.\n
         wobble_I (float): wobble intensity
         """
 
         #TODO think of good way to model wobble
 
-        self.theta += np.random.randn() * wobble_I
-        self.phi += np.random.randn() * wobble_I
+        self.pointing[:] += np.random.randn() * wobble_I
 
     def add_baseline(self,  D, L, W, F, theta_g, length):
         """
@@ -117,13 +107,15 @@ class interferometer():
         construct a full interferometer capable of actually observing images. Without these, no photons can be measured.
         
         Parameters:
-        D (float) = Baseline of the interferometer (in meters)
-        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)
-        L (float) = Length from last mirror to CCD surface (in meters)
-        W (float) = incident photon beam width (in micrometers)
-    	F (float) = effective focal length of interferometer (in meters)
-        theta_g (float) = grazing incidence angle of mirrors (in degrees)
-        length (float) = length of mirrors, needed to define collecting area (in meters)
+        D (float) = Baseline of the interferometer (in meters)\n
+        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)\n
+        L (float) = Length from last mirror to CCD surface (in meters)\n
+        W (float) = incident photon beam width (in micrometers)\n
+    	F (float) = effective focal length of interferometer (in meters)\n
+        theta_g (float) = grazing incidence angle of mirrors (in degrees)\n
+        length (float) = length of mirrors, needed to define collecting area (in meters)\n
         #TODO add more relevant parameters
         """
         self.baselines.append(baseline(D, L, W, F, theta_g, length))
+
+    

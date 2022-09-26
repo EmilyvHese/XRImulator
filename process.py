@@ -9,6 +9,9 @@ in the functions in analysis.py.
 
 import numpy as np
 import instrument as ins
+import scipy.constants as spc
+import matplotlib
+import matplotlib.pyplot as plt
 
 class interferometer_data():
     """ 
@@ -18,12 +21,67 @@ class interferometer_data():
     """
 
     def __init__(self, size):
-        self.x = np.zeros(size)
-        self.y = np.zeros(size)
+        # x and y coordinates of every photon
+        self.pos = np.zeros((size, 2))
 
         self.toa = np.zeros(size)
         self.energies = np.zeros(size)
 
+def process_photons(instrument, image, data, timestep_photons):
+    """
+    This function takes an input image and photon by photon on a discrete timestep passes them through 
+    the specified instrument, giving back the data that this instrument has recorded.
+
+    Parameters:
+    instrument (instrument class object): The instrument to pass the image through.
+    image (image class object): Image to pass through instrument.
+    data (interferometer_data class object): Object to save the instrument data in.
+    timestep_photons: array containing indices of all photons that arrive at the to be processed timestep.
+    """
+    data.toa[timestep_photons] = image.toa[timestep_photons]
+    data.energies[timestep_photons] = image.energies[timestep_photons]
+    
+    # Calculating photon wavelengths and phases from their energies
+    lambdas = spc.h * spc.c / image.energies[timestep_photons]
+    k = 2 * spc.pi / lambdas
+
+    for photon in timestep_photons:
+        # Randomly selecting a baseline for the photon to go in. Possible #TODO fix this to be more accurate than just random?
+        baseline = instrument.baselines[np.random.randint(0, len(instrument.baselines))]
+
+        # Calculating off axis angle of photon
+        theta = np.cos(instrument.roll) * image.loc[photon, 0][0] + np.sin(instrument.roll) * image.loc[photon, 1][0]
+        delta_d = lambda y: 2 * y * np.sin(baseline.theta_b/2) + baseline.D * np.sin(theta)
+        D = lambda y: np.sin(theta) * baseline.D + delta_d(y)
+
+        # projected intensity as a function of y position
+        I = lambda y: 2 + 2*np.cos(k*D(y))
+
+        accepted = False
+        # Doing an accept/reject method to find the precise location photons impact at
+        while accepted != True:
+            photon_y = np.random.rand() * baseline.W - baseline.W/2 + baseline.F * theta
+            photon_I = np.random.rand() * 4
+
+            # Left-over test code
+            # y_test = np.linspace(-baseline.W/2,baseline.W/2, 10000) + baseline.F * theta
+            # plt.plot(y_test, I(y_test))
+            # plt.plot(y_test, 2 + 2*np.cos(D(y_test)))
+            # plt.plot(photon_y, photon_I, 'r.')
+            # plt.show()
+
+            # if photon == 5:
+            #     print(lambdas / baseline.theta_b, baseline.F * theta, theta)
+            if photon_I < I(photon_y):
+                accepted = True
+
+        #TODO convert precise location to pixel position depending on interferometer specs
+
+        # The on-axis angle (as opposed to theta, the off-axis angle)
+        psi = np.cos(instrument.roll) * image.loc[photon, 0] + np.sin(instrument.roll) * image.loc[photon, 1]
+        data.pos[timestep_photons, 0] = baseline.F * psi
+        data.pos[photon, 1] = photon_y
+             
 def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble_c = None):
     """ 
     This function is the main function that takes an image and converts it to instrument data as
@@ -42,10 +100,11 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
     wobble_c (string): Name of function (options: #TODO) to use to correct for wobble. (default None, so no correction)
     """
 
-    data = interferometer_data()
+    data = interferometer_data(image.size)
 
-    for i in range(0, image.toa[-1]):
+    for t in np.arange(0., image.toa[-1]):
         #TODO add stuff that processes the actual image
+        timestep_photons = np.where(image.toa == t)
 
         if wobble:
             instrument.wobbler(wobble_I)
@@ -54,7 +113,11 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
                 #TODO
                 wobble_c(instrument)
 
-        if instrument.D != instrument.target_D:
-            instrument.update_D()
+        # if instrument.D != instrument.target_D:
+        #     instrument.update_D()
+
+        process_photons(instrument, image, data, timestep_photons)
 
     #TODO add noise
+
+    return data
