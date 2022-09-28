@@ -67,6 +67,26 @@ def double_point_source(size, alpha, beta, energy):
 
     return im
 
-if __name__ == "__main__":
-    im = point_source(10, 1, 2, 5)
-    print(im.energies, '\n', im.loc, '\n', im.toa)
+def point_source_multichromatic(size, alpha, beta, energy):
+    """
+    Function that generates an image of a multichromatic point source according to some specifications.
+
+    Parameters:
+
+    size (int) = number of photons to generate from this source.\n
+    alpha (float) = coordinate offset from zero pointing in x-direction (arcsec)\n
+    beta (float) = coordinate offset from zero pointing in y-direction (arcsec)\n
+    energy (list-like of floats) = upper and lower bounds for energy of photons to generate (KeV)\n
+    """
+    im = image(size)
+    for i in range(size):
+        im.energies[i] = (np.random.random() * (energy[1] - energy[0]) + energy[0]) * 1.602177733e-16
+        im.loc[i] = np.array([alpha, beta]) * 2 * np.pi / (3600 * 360)
+        im.toa[i] = i
+
+    return im
+
+
+# if __name__ == "__main__":
+    # im = point_source(10, 1, 2, 5)
+    # print(im.energies, '\n', im.loc, '\n', im.toa)

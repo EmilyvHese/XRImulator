@@ -27,17 +27,21 @@ class interferometer_data():
         self.toa = np.zeros(size)
         self.energies = np.zeros(size)
 
+        # Useful shorthand
+        self.size = size
+
 def process_photons(instrument, image, data, timestep_photons):
     """
     This function takes an input image and photon by photon on a discrete timestep passes them through 
     the specified instrument, giving back the data that this instrument has recorded.
 
     Parameters:
-    instrument (instrument class object): The instrument to pass the image through.
+    instrument (interferometer class object): The instrument to pass the image through.
     image (image class object): Image to pass through instrument.
     data (interferometer_data class object): Object to save the instrument data in.
     timestep_photons: array containing indices of all photons that arrive at the to be processed timestep.
     """
+
     data.toa[timestep_photons] = image.toa[timestep_photons]
     data.energies[timestep_photons] = image.energies[timestep_photons]
     
@@ -70,8 +74,6 @@ def process_photons(instrument, image, data, timestep_photons):
             # plt.plot(photon_y, photon_I, 'r.')
             # plt.show()
 
-            # if photon == 5:
-            #     print(lambdas / baseline.theta_b, baseline.F * theta, theta)
             if photon_I < I(photon_y):
                 accepted = True
 

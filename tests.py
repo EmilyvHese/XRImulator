@@ -62,7 +62,7 @@ def wobbler_test(wobble_I, p = False):
         print(test_i.theta, test_i.phi)
 
 def ps_test():
-    image = images.point_source(10000, 0.001, 0, 1.2)
+    image = images.point_source(10000, 0.00, 0, 1.2)
 
     test_I = instrument.interferometer()
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
@@ -72,12 +72,12 @@ def ps_test():
     test_data = process.process_image(test_I, image, 0)
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    # print(test_data.pos[:, 0])
-    plt.hist(test_data.pos[:,1], 100)
-    plt.show()
+    analysis.hist_interferometer_data(test_data, 100)
+    ft_x_data, ft_y_data = analysis.ft_data(test_data)
+    analysis.plot_ft(ft_x_data, ft_y_data, 2)
 
 def dps_test():
-    image = images.double_point_source(10000, [-.001, .001], [0, 0], [1.2, 1.2])
+    image = images.double_point_source(10000, [-.001, .001], [0, 0], [1.2, 6])
 
     test_I = instrument.interferometer()
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
@@ -87,15 +87,31 @@ def dps_test():
     test_data = process.process_image(test_I, image, 0)
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    # print(test_data.pos[:, 0])
-    plt.hist(test_data.pos[:,1], 100)
-    plt.show()
+    analysis.hist_interferometer_data(test_data, 100)
+    ft_x_data, ft_y_data = analysis.ft_data(test_data)
+    analysis.plot_ft(ft_x_data, ft_y_data, 0)
+
+def psmc_test():
+    image = images.point_source_multichromatic(10000, 0, 0, [1.2, 1.6])
+
+    test_I = instrument.interferometer()
+    test_I.add_baseline(1, 10, 300, 17000, 2, 1)
+    # print(image.loc[2,0])
+
+    start = time.time()
+    test_data = process.process_image(test_I, image, 0)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    analysis.hist_interferometer_data(test_data, 100)
+    ft_x_data, ft_y_data = analysis.ft_data(test_data)
+    analysis.plot_ft(ft_x_data, ft_y_data, 2)
+
 
 if __name__ == "__main__":
     # update_D_test(True)
     # wobbler_test(.005, True)
 
-    ps_test()
+    psmc_test()
 
     # test_ar = np.zeros(2)
     # print(test_ar)
