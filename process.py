@@ -157,44 +157,57 @@ def process_image2(instrument, image, noise, wobble = False, wobble_I = 0, wobbl
     data.energies = image.energies
     
     # Calculating photon wavelengths and phases from their energies
-    k = 2 * spc.pi / spc.h * spc.c / image.energies
+    lambdas = spc.h * spc.c / image.energies
+    k = 2 * spc.pi / lambdas
 
     # Randomly selecting a baseline for the photon to go in. Possible #TODO fix this to be more accurate than just random?
-    baseline = np.random.randint(0, len(instrument.baselines), data.size)
-    roll = np.zeros(np.max(image.toa))
+    baseline_indices = np.random.randint(0, len(instrument.baselines), data.size)
+    baseline_data = np.array([[instrument.baselines[index].W, 
+                                instrument.baselines[index].F, 
+                                instrument.baselines[index].theta_b,
+                                instrument.baselines[index].D] for index in baseline_indices])
 
-    theta = (np.cos(roll[image.toa[:]]) * image.loc[:, 0][0] + 
-                np.sin(roll[image.toa[:]]) * image.loc[:, 1][0])
-    delta_d = lambda y: 2 * y * np.sin(ins.baselines[baseline[:]].theta_b/2) + ins.baselines[baseline[:]].D * np.sin(theta)
-    D = lambda y: np.sin(theta) * ins.baselines[baseline[:]].D + delta_d(y)
+    roll = np.zeros(np.max(image.toa) + 1)
+    theta = (np.cos(roll[image.toa[:]]) * image.loc[:, 0] + 
+                np.sin(roll[image.toa[:]]) * image.loc[:, 1])
+    delta_d = lambda y: 2 * y * np.sin(baseline_data[:,2]/2) + baseline_data[:,3] * np.sin(theta)
+    D = lambda y: np.sin(theta) * baseline_data[:,3] + delta_d(y)
 
     # projected intensity as a function of y position
     I = lambda y: 2 + 2*np.cos(k*D(y))
     # projected intensity as a function of y position
     # I = I_calculator(instrument, image, k, roll)
 
-    accepted = False
+    accepted_array = np.full(image.size, False, bool)
     # Doing an accept/reject method to find the precise location photons impact at
-    while accepted != True:
-        photon_y = np.array([np.random.rand() * baseline.W - baseline.W/2 + baseline.F * theta for i in range(image.size)])
-        photon_I = np.array([np.random.rand() * 4 for i in range(image.size)])
+    while np.any(accepted_array == False):
+        unacc_array = accepted_array == False
+        unacc_ind = np.nonzero(unacc_array)[0]
+
+        photon_y = np.random.rand(image.size) * baseline_data[:, 0] - baseline_data[:, 0]/2 + baseline_data[:, 1] * theta
+        photon_I = np.random.rand(image.size) * 4
+
 
         # Left-over test code
-        # y_test = np.linspace(-baseline.W/2,baseline.W/2, 10000) + baseline.F * theta
+        # y_test = np.linspace(-baseline_data[:,0]/2,baseline_data[:,0]/2, 10000) + baseline_data[:,1] * theta
         # plt.plot(y_test, I(y_test))
         # plt.plot(y_test, 2 + 2*np.cos(D(y_test)))
         # plt.plot(photon_y, photon_I, 'r.')
         # plt.show()
 
-        if photon_I < I(photon_y):
-            accepted = True
+        accepted_array[unacc_ind] = photon_I[unacc_ind] < I(photon_y)[unacc_ind]
+        new_acc_array = np.equal(accepted_array, unacc_array) == False
+        new_acc_ind = np.nonzero(new_acc_array)[0]
+        data.pos[new_acc_ind, 1] = photon_y[new_acc_ind]
+
+        print(np.equal(unacc_ind[new_acc_ind], new_acc_ind))
 
     #TODO convert precise location to pixel position depending on interferometer specs
 
     # The on-axis angle (as opposed to theta, the off-axis angle)
     psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
-    data.pos[:, 0] = baseline.F * psi
-    data.pos[:, 1] = photon_y
+    data.pos[:, 0] = baseline_data[:, 1] * psi
+    # data.pos[:, 1] = photon_y
              
 
     return data

@@ -36,6 +36,15 @@ class baseline():
         self.theta_b = D / (2 * F)
         self.colarea = W * length * 2
 
+def get_W(baseline):
+    return baseline.W
+
+def get_theta_b(baseline):
+    return baseline.theta_b
+
+def get_F(baseline):
+    return baseline.F
+
         
 class interferometer():
     """ 
