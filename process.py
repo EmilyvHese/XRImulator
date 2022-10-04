@@ -158,7 +158,10 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
                                 instrument.baselines[index].theta_b,
                                 instrument.baselines[index].D] for index in baseline_indices])
 
+    # Defining the roll over time #TODO add time dependent roll
     roll = np.zeros(np.max(image.toa) + 1)
+
+    
     theta = (np.cos(roll[image.toa[:]]) * image.loc[:, 0] + 
                 np.sin(roll[image.toa[:]]) * image.loc[:, 1])
     delta_d = lambda y: 2 * y * np.sin(baseline_data[:, 2]/2) + baseline_data[:, 3] * np.sin(theta)
@@ -193,5 +196,4 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
     psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
     data.pos[:, 0] = baseline_data[:, 1] * psi
              
-
     return data
