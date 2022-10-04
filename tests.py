@@ -62,11 +62,10 @@ def wobbler_test(wobble_I, p = False):
         print(test_i.theta, test_i.phi)
 
 def ps_test():
-    image = images.point_source(100000, 0.00, 0.001, 1.2)
+    image = images.point_source(int(1e6), 0.00, 0.001, 1.2)
 
     test_I = instrument.interferometer()
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
-    # print(image.loc[2,0])
 
     start = time.time()
     test_data = process.process_image2(test_I, image, 0)
@@ -109,17 +108,3 @@ def psmc_test():
 
 if __name__ == "__main__":
     ps_test()
-
-    # accepted_array[unacc_array] = photon_I[unacc_array] < I(photon_y)[unacc_array]
-    # acc_I = np.equal(unacc_array, accepted_array)
-    # print(acc_I == False)
-    # data.pos[acc_I == False, 1] = photon_y[acc_I == False]
-
-    # ps_array = np.zeros(3)
-    # unacc_array = np.array([False, False, False])
-    # test_arr = np.array([1, 2, 3]) < np.array([2,3,1])
-    # acc_array = np.equal(unacc_array, test_arr)
-    # print(acc_array == False)
-    # ps_array[acc_array == False] = np.array([1,2,3])[acc_array == False]
-    # print(ps_array)
-
