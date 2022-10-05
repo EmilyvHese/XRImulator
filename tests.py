@@ -62,13 +62,13 @@ def wobbler_test(wobble_I, p = False):
         print(test_i.theta, test_i.phi)
 
 def ps_test():
-    image = images.point_source(int(1e6), 0.00, 0.001, 1.2)
+    image = images.point_source(int(1e6), 0.001, 0.00, 1.2)
 
     test_I = instrument.interferometer()
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
 
     start = time.time()
-    test_data = process.process_image2(test_I, image, 0)
+    test_data = process.process_image(test_I, image, 0)
     print('Processing this image took ', time.time() - start, ' seconds')
 
     analysis.hist_interferometer_data(test_data, 100)
