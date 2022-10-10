@@ -24,6 +24,8 @@ class interferometer_data():
     def __init__(self, size):
         # x and y coordinates of every photon
         self.pos = np.zeros((size, 2))
+        # Pixel coordinates of every photon
+        self.pix = np.zeros((size, 2))
 
         self.toa = np.zeros(size)
         self.energies = np.zeros(size)
@@ -56,7 +58,7 @@ def process_photon_dpos(instrument, image, data):
 
     Paramater definitions can be found in process_image.
     """
-     # Calculating photon wavelengths and phases from their energies
+    # Calculating photon wavelengths and phases from their energies
     lambdas = spc.h * spc.c / image.energies
     k = 2 * spc.pi / lambdas
 
@@ -67,7 +69,7 @@ def process_photon_dpos(instrument, image, data):
                                 instrument.baselines[index].theta_b,
                                 instrument.baselines[index].D] for index in baseline_indices])
 
-    # Defining the roll and off-axis angle for each photon over time #TODO add time dependent roll
+    # Defining the roll and off-axis angle for each photon over time #TODO add time dependent roll and find better name
     roll = np.zeros(np.max(image.toa) + 1)
     theta = (np.cos(roll[image.toa[:]]) * image.loc[:, 0] + 
                 np.sin(roll[image.toa[:]]) * image.loc[:, 1])
@@ -102,8 +104,8 @@ def process_photon_dpos(instrument, image, data):
     #TODO convert precise location to pixel position depending on interferometer specs
 
     # The on-axis angle (as opposed to theta, the off-axis angle)
-    psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
-    data.pos[:, 0] = baseline_data[:, 1] * psi
+    # psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
+    # data.pos[:, 0] = baseline_data[:, 1] * psi
 
 def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble_c = None):
     """ 
@@ -127,6 +129,8 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
 
     process_photon_energies(instrument, image, data)
     process_photon_toa(instrument, image, data)
+
+    #TODO look into using pdf
     process_photon_dpos(instrument, image, data)
              
     return data
