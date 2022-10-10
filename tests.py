@@ -1,11 +1,10 @@
+from cProfile import label
 import numpy as np
 import scipy.special as sps
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
-
-from sympy import fu
 
 import images
 import instrument
@@ -66,7 +65,7 @@ def wobbler_test(wobble_I, p = False):
         print(test_i.theta, test_i.phi)
 
 def ps_test():
-    image = images.point_source(int(1e7), 0.001, 0.00, 1.2)
+    image = images.point_source(int(1e6), 0.001, 0.00, 1.2)
 
     test_I = instrument.interferometer()
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
@@ -110,8 +109,8 @@ def psmc_test():
     analysis.plot_ft(ft_x_data, ft_y_data, 0)
 
 def Fre_test():
-    u_0 = np.linspace(4, 5, 100)
-    # u_0 = 4.5
+    # u_0 = np.linspace(4, 5, 100)
+    u_0 = 4.5
     u_1 = lambda u, u_0: u + u_0/2
     u_2 = lambda u, u_0: u - u_0/2
     u = np.linspace(-5, 5, 1000) 
@@ -126,13 +125,13 @@ def Fre_test():
     I = A * A_star
 
     fig = plt.figure(figsize=(8, 6))
-    ax = plt.axes(projection='3d')
-    ax.plot_surface(u, u_0, np.real(I))
-    ax.set_xlabel('u')
-    ax.set_ylabel('u_0')
-    ax.set_zlabel('I')
+    # ax = plt.axes(projection='3d')
+    # ax.plot_surface(u, u_0, np.real(I))
+    # ax.set_xlabel('u')
+    # ax.set_ylabel('u_0')
+    # ax.set_zlabel('I')
 
-    # plt.plot(u, np.real(I))
+    plt.plot(u, np.real(I))
 
     plt.show()
 
@@ -154,7 +153,16 @@ def scale_test():
     plt.plot(x, I[50,:])
     plt.show()
 
+def scale_test2():
+    func = lambda k, x: 2 + 2 * np.cos(k * x)
+    x = np.linspace(0, 2, 1000)
+    plt.plot(x, func(1, x), label="1, x")
+    plt.plot(x, func(2, x), label="2, x")
+    plt.plot(2*x, func(2, x), label="2, 2x")
+    plt.legend()
+    plt.show()
+
 if __name__ == "__main__":
-    # ps_test()
+    ps_test()
     # Fre_test()
-    scale_test()
+    # scale_test2()
