@@ -4,6 +4,7 @@ It will also contain methods used for manipulating these virtual instruments as 
 """
 
 import numpy as np
+import scipy.interpolate as spinter
 
 class baseline():
     """
@@ -35,16 +36,6 @@ class baseline():
         # Calculating some more relevant parameters for ease of access.
         self.theta_b = D / (2 * F)
         self.colarea = W * length * 2
-
-def get_W(baseline):
-    return baseline.W
-
-def get_theta_b(baseline):
-    return baseline.theta_b
-
-def get_F(baseline):
-    return baseline.F
-
         
 class interferometer():
     """ 
@@ -52,20 +43,18 @@ class interferometer():
     It contains the code needed to generate the interferometer and adapt some of its characteristics afterwards.
     """
 
-    def __init__(self):
+    def __init__(self, res_E, res_t, res_pos, E_range, pos_range):
         """ 
         Function that generates a virtual x-ray interferometer according to given specifications.
         
         Parameters:
         #TODO update this description
 
-        D (float) = Baseline of the interferometer (in meters)
-        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)
-        L (float) = Length from last mirror to CCD surface (in meters)
-        W (float) = incident photon beam width (in micrometers)
-    	F (float) = effective focal length of interferometer (in meters)
-        theta_g (float) = grazing incidence angle of mirrors (in degrees)
-        #TODO add more relevant parameters
+        res_E (float) = Energy resolution of CCD's in instrument (in KeV)
+        res_t (float) = Time resolution of CCD's in instrument (seconds)
+        res_pos (float) = Length from last mirror to CCD surface (in meters)
+        E_range (array-like of floats) = incident photon beam width (in micrometers)
+    	pos_range (array-like of floats) = effective focal length of interferometer (in meters)
         """
 
         # # Setting target values for changeable parameters
@@ -80,6 +69,14 @@ class interferometer():
         # Roll direction, to support filling out entire u,v plane
         # Standard is pi/2 since the default axis of measurement in literature is the y-axis
         self.roll = 0
+
+        # Different resolutions, with energy, time and pixel size.
+        self.res_E = res_E * 1.602177733e-16
+        self.res_t = res_t
+        self.res_pos = res_pos * 10**-6
+
+        self.E_range = E_range * 1.602177733e-16
+        self.pos_range = pos_range * 10**-6
 
     def update_D(self):
         """ Function that updates the baseline towards the target baseline on a single timestep. """
@@ -126,5 +123,3 @@ class interferometer():
         #TODO add more relevant parameters
         """
         self.baselines.append(baseline(D, L, W, F, theta_g, length))
-
-    

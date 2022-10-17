@@ -104,3 +104,82 @@ def process_image(instrument, image, noise, wobble = False, wobble_I = 0, wobble
     #TODO add noise
 
     return data
+
+def process_photon_dpos(instrument, image, data):
+    """
+    This function is a helper function for process_image that specifically processes the locations where photons impact
+    on the detector (hence the d(etector)pos(ition) name). Not to be used outside the process_image context.
+
+    Paramater definitions can be found in process_image.
+    """
+    # Calculating photon wavelengths and phases from their energies
+    lambdas = spc.h * spc.c / image.energies
+    k = 2 * spc.pi / lambdas
+
+    # Randomly selecting a baseline for the photon to go in. Possible #TODO fix this to be more accurate than just random?
+    baseline_indices = np.random.randint(0, len(instrument.baselines), data.size)
+    baseline_data = np.array([[instrument.baselines[index].W, 
+                                instrument.baselines[index].F, 
+                                instrument.baselines[index].theta_b,
+                                instrument.baselines[index].D] for index in baseline_indices])
+
+    # Defining the roll and off-axis angle for each photon over time #TODO add time dependent roll and find better name
+    roll = np.zeros(np.max(image.toa) + 1)
+    theta = (np.cos(roll[image.toa[:]]) * image.loc[:, 0] + 
+                np.sin(roll[image.toa[:]]) * image.loc[:, 1])
+
+    # Doing an accept/reject method to find the precise location photons impact at.
+    # It uses a formula from #TODO add reference to that one presentation
+    # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
+    accepted_array = np.full(image.size, False, bool)
+    while np.any(accepted_array == False):
+        # Indices of all unaccepted photons, which are the only ones that need to be generated again each loop.
+        unacc_ind = np.nonzero(accepted_array == False)[0]
+
+        # Generating new photons for all the unaccepted indices with accurate y-locations and random intensities.
+        photon_y = (np.random.rand(len(unacc_ind)) * baseline_data[unacc_ind, 0] 
+                    - baseline_data[unacc_ind, 0]/2 
+                    + baseline_data[unacc_ind, 1] * theta[unacc_ind])
+        photon_I = np.random.rand(len(unacc_ind)) * 4
+
+        # Functions necessary to calculate I later
+        delta_d = (lambda y: 2 * y * np.sin(baseline_data[unacc_ind, 2]/2) 
+                    + baseline_data[unacc_ind, 3] * np.sin(theta[unacc_ind]))
+        D = lambda y: np.sin(theta[unacc_ind]) * baseline_data[unacc_ind, 3] + delta_d(y)
+
+        # Projected intensity as a function of y position
+        I = lambda y: 2 + 2 * np.cos(k[unacc_ind] * D(y))
+
+        # Checking which photons will be accepted, and updating the accepted_array accordingly
+        accepted_array[unacc_ind] = photon_I < I(photon_y)
+
+        data.pos[unacc_ind, 1] = photon_y
+
+    #TODO convert precise location to pixel position depending on interferometer specs
+
+    # The on-axis angle (as opposed to theta, the off-axis angle)
+    # psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
+    # data.pos[:, 0] = baseline_data[:, 1] * psi
+
+def discretize_pos(self, ins, data, pixel_pos = True):
+    """
+    Function that discretizes positions of incoming photons into pixel positions.
+    Currently only takes into account x_position as that is the only one that should matter,
+    as in the y-direction everyhting should be uniform. #TODO check whether this should change
+
+    Parameters:
+    data (interferometer-class object): data object containing the position data to discretize.
+    pixel_pos (boolean): Indicates whether output is wanted in terms of pixel position or not. 
+    If False, will return discretized position values that are in the middle of their respective pixels\n
+
+    Returns:
+    An array containing the pixel positions of each photon if pixel_pos is True.
+    Pixel positions start at 0 and continue until (pos_range[0,1] - pos_range[0,0]) // res_pos.\n
+    An array containing the positions of the middle of associated pixels of each photon if pixel_pos is False.
+    """
+    pix_edges = np.arange(ins.pos_range[0, 0], ins.pos_range[0, 1], ins.res_pos)
+    pix_binner = spinter.interp1d(pix_edges, pix_edges, 'nearest', bounds_error=False)
+    if pixel_pos:
+        return ((pix_binner(data.energies) - ins.pos_range[0]) // ins.res_pos) - 1
+    else:
+        return pix_binner(data.energies) + ins.res_pos / 2

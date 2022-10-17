@@ -1,6 +1,7 @@
 from cProfile import label
 import numpy as np
 import scipy.special as sps
+import scipy.interpolate as spinter
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -65,48 +66,50 @@ def wobbler_test(wobble_I, p = False):
         print(test_i.theta, test_i.phi)
 
 def ps_test():
-    image = images.point_source(int(1e6), 0.001, 0.00, 1.2)
+    image = images.point_source(int(1e5), 0.0001, 0.00, 1.2)
 
-    test_I = instrument.interferometer()
+    test_I = instrument.interferometer(0,0,0,0,0)
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
 
     start = time.time()
-    test_data = process.process_image(test_I, image, 0)
+    test_data = process.process_image(test_I, image, 0, 10, int(1e4))
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    analysis.hist_interferometer_data(test_data, 100)
+    analysis.hist_data(test_data.discrete_pos, 100)
     ft_x_data, ft_y_data = analysis.ft_data(test_data)
     analysis.plot_ft(ft_x_data, ft_y_data, 2)
 
 def dps_test():
     image = images.double_point_source(10000, [-.001, .001], [0, 0], [1.2, 6])
 
-    test_I = instrument.interferometer()
+    test_I = instrument.interferometer(0,0,0,0,0)
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
     # print(image.loc[2,0])
 
     start = time.time()
-    test_data = process.process_image(test_I, image, 0)
+    test_data = process.process_image(test_I, image, 0, 10, int(1e4))
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    analysis.hist_interferometer_data(test_data, 100)
+    analysis.hist_data(test_data.discrete_pos, 100)
     ft_x_data, ft_y_data = analysis.ft_data(test_data)
     analysis.plot_ft(ft_x_data, ft_y_data, 0)
 
 def psmc_test():
-    image = images.point_source_multichromatic(10000, 0, 0, [1.2, 6])
+    image = images.point_source_multichromatic(int(1e6), 0.0001, 0, [1.2, 1.6])
 
-    test_I = instrument.interferometer()
+    # TODO 10 micron is better pixel size
+    test_I = instrument.interferometer(.1, 0, .1, np.array([1.2, 6]), np.array([-1500, 1500]))
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
-    # print(image.loc[2,0])
 
     start = time.time()
-    test_data = process.process_image(test_I, image, 0)
+    test_data = process.process_image(test_I, image, 0, 10, int(1e4))
     print('Processing this image took ', time.time() - start, ' seconds')
+    test_data.discretize_E(test_I)
+    test_data.discretize_pos(test_I)
 
-    analysis.hist_interferometer_data(test_data, 100)
-    ft_x_data, ft_y_data = analysis.ft_data(test_data)
-    analysis.plot_ft(ft_x_data, ft_y_data, 0)
+    analysis.hist_data(test_data.pixel_to_pos(test_I), 100)
+    ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I))
+    analysis.plot_ft(ft_x_data, ft_y_data, 2)
 
 def Fre_test():
     # u_0 = np.linspace(4, 5, 100)
@@ -162,7 +165,26 @@ def scale_test2():
     plt.legend()
     plt.show()
 
+def discretize_E_test(E_range, res_E, data):
+    """
+    Function that discretizes energies of incoming photons into energy channels.
+
+    Parameters:
+    data (interferometer-class object): data object containing the energy data to discretize.
+    """
+    E_edges = np.arange(E_range[0], E_range[1], res_E)
+    E_binner = spinter.interp1d(E_edges, E_edges, 'nearest', bounds_error=False)
+    return E_binner(data.energies)
+
+def discretize_test():
+    data = process.interferometer_data(10)
+    data.energies = np.array([1.6, 2.3, 3.1, 4.2, 5.5, 6.0, 7.3, 8.1, 9.9, 10.6])
+
+    print(discretize_E_test([0, 11], 1, data))
+
+
 if __name__ == "__main__":
-    ps_test()
+    psmc_test()
     # Fre_test()
     # scale_test2()
+    # discretize_test()

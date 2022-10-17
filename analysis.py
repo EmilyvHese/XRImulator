@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import scipy.fft as ft
 
-def hist_interferometer_data(data, binsno):
+def hist_data(data, binsno):
     """
     Function that makes a histogram of direct output data from an interferometer object.
 
@@ -16,7 +16,7 @@ def hist_interferometer_data(data, binsno):
     binsno (int): Number of bins in the histogram.
     """
 
-    plt.hist(data.pos[:,1], binsno)
+    plt.hist(data, binsno)
     plt.show()
 
 def ft_data(data):
@@ -27,8 +27,8 @@ def ft_data(data):
     Parameters:
     data (interferometer_data class object): Data to be fourier transformed.
     """
-    samples = data.size // 10
-    y_data, edges = np.histogram(data.pos[:,1], samples)
+    samples = len(data) // 10
+    y_data, edges = np.histogram(data, samples)
     ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
     ft_y_data = ft.fft(y_data)
 

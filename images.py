@@ -16,7 +16,7 @@ class image():
     def __init__(self, size):
         """ Initiation function for the class. Generates arrays of the specified size for each parameter specified in the class docstring. """
         # Abbreviation of 'Times Of Arrival'.
-        self.toa = np.zeros(size)
+        self.toa = np.zeros(size, dtype=int)
         self.energies = np.zeros(size)
 
         # Array containing coordinates of origin for each photon.
@@ -59,7 +59,7 @@ def double_point_source(size, alpha, beta, energy):
     energy (list-like of floats) = energies of photons to generate (KeV)\n
     """
     im = image(size)
-    for i in range(size):
+    for i in range(0, size):
         source = np.random.randint(0,2)
         im.energies[i] = energy[source] * 1.602177733e-16
         im.loc[i] = np.array([alpha[source], beta[source]]) * 2 * np.pi / (3600 * 360)
@@ -79,7 +79,7 @@ def point_source_multichromatic(size, alpha, beta, energy):
     energy (list-like of floats) = upper and lower bounds for energy of photons to generate (KeV)\n
     """
     im = image(size)
-    for i in range(size):
+    for i in range(0, size):
         im.energies[i] = (np.random.random() * (energy[1] - energy[0]) + energy[0]) * 1.602177733e-16
         im.loc[i] = np.array([alpha, beta]) * 2 * np.pi / (3600 * 360)
         im.toa[i] = i
