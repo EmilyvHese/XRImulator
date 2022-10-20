@@ -43,18 +43,26 @@ class interferometer():
     It contains the code needed to generate the interferometer and adapt some of its characteristics afterwards.
     """
 
-    def __init__(self, res_E, res_t, res_pos, E_range, pos_range):
+    def __init__(self, res_E, res_t, res_pos, E_range, pos_range, 
+                    wobble_I = 0., wobble_c = None, 
+                    roller = None, roll_speed = 0., roll_stop_t = 0., roll_stop_a = 0.):
         """ 
         Function that generates a virtual x-ray interferometer according to given specifications.
         
         Parameters:
         #TODO update this description
 
-        res_E (float) = Energy resolution of CCD's in instrument (in KeV)
-        res_t (float) = Time resolution of CCD's in instrument (seconds)
-        res_pos (float) = Length from last mirror to CCD surface (in meters)
-        E_range (array-like of floats) = incident photon beam width (in micrometers)
-    	pos_range (array-like of floats) = effective focal length of interferometer (in meters)
+        res_E (float) = Energy resolution of CCD's in instrument (in KeV)\n
+        res_t (float) = Time resolution of CCD's in instrument (seconds)\n
+        res_pos (float) = Length from last mirror to CCD surface (in meters)\n
+        E_range (array-like of floats) = incident photon beam width (in micrometers)\n
+    	pos_range (array-like of floats) = effective focal length of interferometer (in meters)\n
+        wobble_I (float) = Intensity of wobble effect, used as sigma in for normally distributed random walk steps. Default is 0, which means no wobble. (in arcsec)\n
+        wobble_c (function) = function to use to correct for spacecraft wobble in observation (possibly not relevant here)\n
+        roller (function) = function to use to simulate the spacecraft rolling. Options are 'smooth_roll' and 'discrete_roll'.\n
+        roll_speed (float) = Indicator for how quickly spacecraft rolls around. Default is 0, meaning no roll. (in rad/sec)\n
+        roll_stop_t (float) = Indicator for how long spacecraft rests at specific roll if using 'discrete_roll'. Default is 0, meaning it doesn't stop. (in seconds)\n
+        roll_stop_a (float) = Indicator for at what angle increments spacecraft rests at if using 'discrete_roll'. Default is 0, meaning it doesn't stop. (in rads)\n
         """
 
         # # Setting target values for changeable parameters
@@ -78,6 +86,14 @@ class interferometer():
         self.E_range = E_range * 1.602177733e-16
         self.pos_range = pos_range * 10**-6
 
+        self.wobble_I = wobble_I
+        self.wobble_c = wobble_c
+
+        self.roller = roller
+        self.roll_speed = roll_speed
+        self.roll_stop_t = roll_stop_t
+        self.roll_stop_a = roll_stop_a
+
     def update_D(self):
         """ Function that updates the baseline towards the target baseline on a single timestep. """
         if self.D < self.target_D - self.D_varspeed:
@@ -93,7 +109,7 @@ class interferometer():
         """ Function that sets a new target value for the baseline, to adjust the device towards. """
         self.target_D = target_D
 
-    def wobbler(self, wobble_I):
+    def wobbler(self, pointing):
         """ 
         Function that adds 'wobble' to the spacecraft, slightly offsetting its pointing every timestep.
 
@@ -102,12 +118,48 @@ class interferometer():
         Instrument (interferometer class object): instrument to offset.\n
         wobble_I (float): wobble intensity
         """
+        pointing[1:, :2] = pointing[:-1, :2] + np.random.normal(0, self.wobble_I, size=(len(pointing[:, 0]) - 1, 2)) * 2 * np.pi / (3600 * 360)
+        return pointing
 
-        #TODO think of good way to model wobble
+    def smooth_roller(self, pointing):
 
-        self.pointing[:] += np.random.randn() * wobble_I
+        pointing[1:, 2] = pointing[:-1, 2] + self.roll_speed * self.res_t
+        return pointing
 
-    def add_baseline(self,  D, L, W, F, theta_g, length):
+    def discrete_roller(self, pointing):
+        time_to_move = self.roll_stop_t // self.res_t
+        angle_to_move = self.roll_stop_a
+        for i, a in enumerate(pointing[:, 2]):
+            t_to_move = i - time_to_move
+
+            if t_to_move > 0.:
+                pointing[i, 2] = pointing[i - 1, 2] + self.roll_speed * self.res_t
+            else:
+                pointing[i, 2] = pointing[i - 1, 2]
+
+            if pointing[i, 2] > angle_to_move:
+                angle_to_move += self.roll_stop_a
+                time_to_move += self.roll_stop_t // self.res_t
+            
+        return pointing
+
+    def gen_pointing(self, t_exp):
+        """ 
+        This function generates a pointing vector for each time step in an observation
+        """
+        pointing = np.zeros(((t_exp // self.res_t) + 1, 3))
+        if self.wobble_I:
+            pointing = self.wobbler(pointing)
+
+        if self.roll_speed:
+            pointing = self.roller(self, pointing)
+
+        if self.wobble_c:
+            pass
+
+        return pointing
+
+    def add_baseline(self, D, L, W, F, theta_g, length):
         """
         Function that adds a baseline of given parameters to the interferometer object. Call this function multiple times to
         construct a full interferometer capable of actually observing images. Without these, no photons can be measured.

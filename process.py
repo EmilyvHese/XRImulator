@@ -81,7 +81,7 @@ def process_photon_energies(insturment, image, data):
     #TODO add the energy channels and noise to energy recording
     data.energies = image.energies
 
-def process_photon_toa(insturment, image, data):
+def process_photon_toa(instrument, image, data):
     """
     This function is a helper function for process_image that specifically processes the times at which photons arrive
     how the instrument records them.
@@ -99,7 +99,9 @@ def fre_dif(N_f, samples):
     u_0 = np.sqrt(2 * N_f)
     u_1 = lambda u, u_0: u + u_0/2
     u_2 = lambda u, u_0: u - u_0/2
-    u = np.linspace(-u_0*1.5, u_0*1.5, samples)
+
+    # Times 5 to probe a large area for the later interpolation
+    u = np.linspace(-u_0, u_0, samples) * 5 
 
     S_1, C_1 = sps.fresnel(u_1(u, u_0))
     S_2, C_2 = sps.fresnel(u_2(u, u_0))
@@ -110,7 +112,7 @@ def fre_dif(N_f, samples):
     I = A * A_star
     I_pdf = I / sum(I)
 
-    return spinter.interp1d(u, I_pdf)
+    return spinter.interp1d(u, I_pdf, bounds_error=False, fill_value=0)
 
 def detected_intensity(theta_b, theta, k, D, y):
     """
@@ -148,7 +150,8 @@ def process_photon_dpos(instrument, image, data, N_f, samples):
     inter_pdf = fre_dif(N_f, samples)
 
     # Defining the pointing and off-axis angle for each photon over time #TODO add time dependent pointing
-    pointing = np.zeros((np.max(image.toa) + 1, 3))
+    pointing = instrument.gen_pointing(np.max(image.toa))
+    print(pointing[:,2])
     theta = (np.cos(pointing[image.toa[:], 2]) * (image.loc[:, 0] + pointing[image.toa[:], 0]) + 
                 np.sin(pointing[image.toa[:], 2]) * (image.loc[:, 1] + pointing[image.toa[:], 1]))
 
@@ -179,6 +182,10 @@ def process_photon_dpos(instrument, image, data, N_f, samples):
         # Checking which photons will be accepted, and updating the accepted_array accordingly
         accepted_array[unacc_ind] = photon_I < (I * photon_fresnell)
         data.pos[unacc_ind, 1] = photon_y
+
+    # pointing *= 360 * 3600 / (2*np.pi)
+    # plt.plot(pointing[:,0], pointing[:,1])
+    # plt.show()
 
     # The on-axis angle (as opposed to theta, the off-axis angle)
     # psi = np.cos(instrument.roll) * image.loc[:, 0] + np.sin(instrument.roll) * image.loc[:, 1]
