@@ -41,10 +41,10 @@ def dps_test():
     analysis.plot_ft(ft_x_data, ft_y_data, 0)
 
 def psmc_test():
-    image = images.point_source_multichromatic(int(1e6), 0.0001, 0, [1.2, 1.6])
+    image = images.point_source_multichromatic(int(1e5), 0.000, 0, [1.2, 1.6])
 
     # TODO 10 micron is better pixel size
-    test_I = instrument.interferometer(.1, 0, .1, np.array([1.2, 6]), np.array([-1500, 1500]))
+    test_I = instrument.interferometer(.1, 1, 10, np.array([1.2, 6]), np.array([-1500, 1500]))
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
 
     start = time.time()
@@ -53,7 +53,8 @@ def psmc_test():
     test_data.discretize_E(test_I)
     test_data.discretize_pos(test_I)
 
-    analysis.hist_data(test_data.pixel_to_pos(test_I), 100)
+    print(int(np.amax(test_data.discrete_pos) - np.amin(test_data.discrete_pos)))
+    analysis.hist_data(test_data.discrete_pos, int(np.amax(test_data.discrete_pos) - np.amin(test_data.discrete_pos)))
     ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I))
     analysis.plot_ft(ft_x_data, ft_y_data, 2)
 
@@ -128,23 +129,22 @@ def discretize_test():
 
     print(discretize_E_test([0, 11], 1, data))
 
+#wobble point source
 def w_ps_test():
-    image = images.point_source_multichromatic(int(1e6), 0.000, 0, [1.2, 1.6])
+    image = images.point_source_multichromatic(int(1e6), 0.0001, 0, [1.2, 1.6])
 
     # TODO 10 micron is better pixel size
-    test_I = instrument.interferometer(.1, 1, .1, np.array([1.2, 6]), np.array([-400, 400]), 0.001, None, instrument.interferometer.discrete_roller, .01 * 2 * np.pi, 10, np.pi/4)
+    test_I = instrument.interferometer(.1, .01, 10, np.array([1.2, 6]), np.array([-400, 400]), 0.001, None, instrument.interferometer.smooth_roller, .01 * 2 * np.pi, 10, np.pi/4)
     test_I.add_baseline(1, 10, 300, 17000, 2, 1)
 
     start = time.time()
-    test_data = process.process_image(test_I, image, 0, 10, int(1e4))
+    test_data = process.interferometer_data(image.size)
+    test_data.process_image(test_I, image, 10, int(1e4))
     print('Processing this image took ', time.time() - start, ' seconds')
-    test_data.discretize_E(test_I)
-    test_data.discretize_pos(test_I)
 
-    analysis.hist_data(test_data.discrete_pos, 400)
+    analysis.hist_data(test_data.pixel_to_pos(test_I), int(np.amax(test_data.discrete_pos) - np.amin(test_data.discrete_pos)), False)
     ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I))
     analysis.plot_ft(ft_x_data, ft_y_data, 2)
-
 
 if __name__ == "__main__":
     w_ps_test()

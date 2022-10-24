@@ -7,16 +7,23 @@ import matplotlib
 import matplotlib.pyplot as plt
 import scipy.fft as ft
 
-def hist_data(data, binsno):
+def hist_data(data, binsno, pixs = False):
     """
     Function that makes a histogram of direct output data from an interferometer object.
 
     Parameter:
     data (interferometer_data class object): Data to be plotted.
     binsno (int): Number of bins in the histogram.
+    pixs (Boolean): whether the x-axis is in units of pixels or meters. If true, then in pixels. Default is False.
     """
 
-    plt.hist(data, binsno)
+    if pixs:
+        plt.hist(data, binsno)
+        plt.xlabel('Detector position (pixels)')
+    else:
+        plt.hist(data * 1e6, binsno)
+        plt.xlabel('Detector position (micrometers)')
+    plt.ylabel('Counts')
     plt.show()
 
 def ft_data(data):

@@ -147,7 +147,7 @@ class interferometer():
         """ 
         This function generates a pointing vector for each time step in an observation
         """
-        pointing = np.zeros(((t_exp // self.res_t) + 1, 3))
+        pointing = np.zeros((int(t_exp / self.res_t) + 1, 3))
         if self.wobble_I:
             pointing = self.wobbler(pointing)
 

@@ -185,6 +185,8 @@ def discretize_pos(self, ins, data, pixel_pos = True):
     else:
         return pix_binner(data.energies) + ins.res_pos / 2
 
+""
+
 def update_D_test(p = False):
     """ Test to verify whether the 'update_D' from instrument.py works correctly. """
 
@@ -237,3 +239,15 @@ def wobbler_test(wobble_I, p = False):
             print(test_i.theta, test_i.phi)
             test_i.wobbler(wobble_I)
         print(test_i.theta, test_i.phi)
+
+""
+
+# E_edges = np.linspace(ins.E_range[0], ins.E_range[1], (ins.E_range[1] - ins.E_range[0])/ins.res_E)
+# E_binner = spinter.interp1d(E_edges, E_edges, 'nearest', bounds_error=False)
+
+# self.discrete_E = ((E_binner(self.energies) - ins.E_range[0]) // ins.res_E) - 1
+
+# pix_edges = np.linspace(ins.pos_range[0, 0], ins.pos_range[0, 1], (ins.pos_range[0, 1] - ins.pos_range[0, 0])/ins.res_pos)
+# pix_binner = spinter.interp1d(pix_edges, pix_edges, 'nearest', bounds_error=False)
+
+# self.discrete_pos = ((pix_binner(self.pos[:, 0]) - ins.pos_range[0, 0]) // ins.res_pos) - 1
