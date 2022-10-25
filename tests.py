@@ -131,7 +131,7 @@ def discretize_test():
 
 #wobble point source
 def w_ps_test():
-    image = images.point_source_multichromatic(int(1e6), 0.0001, 0, [1.2, 1.6])
+    image = images.point_source_multichromatic(int(1e5), 0.0001, 0, [1.2, 1.6])
 
     # TODO 10 micron is better pixel size
     test_I = instrument.interferometer(.1, .01, 10, np.array([1.2, 6]), np.array([-400, 400]), 0.001, None, instrument.interferometer.smooth_roller, .01 * 2 * np.pi, 10, np.pi/4)

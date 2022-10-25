@@ -139,7 +139,7 @@ class interferometer_data():
             accepted_array[unacc_ind] = photon_I < (I * photon_fresnell)
             self.actual_pos[unacc_ind, 1] = photon_y
 
-        self.noisy_pos = np.random.normal(self.actual_pos[:, 1], instrument.res_pos)
+        # self.noisy_pos = np.random.normal(self.actual_pos[:, 1], instrument.res_pos)
 
         # Visualization option for pointing progression
         # pointing *= 360 * 3600 / (2*np.pi)
@@ -168,7 +168,7 @@ class interferometer_data():
         Parameters:
         ins (interferometer-class object): object containing the specifications for discretisation.\n
         """
-        self.discrete_pos = (self.noisy_pos - ins.pos_range[0]) // ins.res_pos
+        self.discrete_pos = (self.actual_pos - ins.pos_range[0]) // ins.res_pos
         
     def pixel_to_pos(self, ins):
         """ Method that turns discretized positions into the positions at the center of their respective pixels. """
