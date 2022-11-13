@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import scipy.fft as ft
 
-def hist_data(data, binsno, pixs = False):
+def hist_data(data, binsno, pixs = False, num = 0):
     """
     Function that makes a histogram of direct output data from an interferometer object.
 
@@ -18,13 +18,13 @@ def hist_data(data, binsno, pixs = False):
     """
 
     if pixs:
-        plt.hist(data, binsno)
+        plt.hist(data, binsno, label=f'Baseline {num}')
         plt.xlabel('Detector position (pixels)')
     else:
-        plt.hist(data * 1e6, binsno)
+        plt.hist(data * 1e6, binsno, label=f'Baseline {num}')
         plt.xlabel('Detector position (micrometers)')
     plt.ylabel('Counts')
-    plt.show()
+    # plt.show()
 
 def ft_data(data):
     """
@@ -41,7 +41,7 @@ def ft_data(data):
 
     return ft_x_data, ft_y_data
 
-def plot_ft(ft_x_data, ft_y_data, log=0):
+def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     """
     Function to plot fourier transformed interferometer data in a anumber of ways.
 
@@ -51,11 +51,11 @@ def plot_ft(ft_x_data, ft_y_data, log=0):
     log (int in [0,2]): indicates how many axes are to be in log scale, with 1 having only the y-axis in log.
     """
     if log == 0:
-        plt.plot(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)))
+        plt.plot(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
     if log == 1:
-        plt.semilogy(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)))
+        plt.semilogy(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
     if log == 2:
-        plt.loglog(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)))
+        plt.loglog(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
 
     # plt.ylim(bottom=samples/10)
-    plt.show()
+    # plt.show()

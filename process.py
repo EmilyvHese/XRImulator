@@ -58,9 +58,32 @@ class interferometer_data():
     Does not contain manipulation methods, data inside will have to be edited via external methods.
     """
 
-    def __init__(self, size):
+    def __init__(self, instrument, image, N_f, samples):
+        """ 
+        This function is the main function that takes an image and converts it to instrument data as
+        if the instrument had just observed the object te image is a representation of. 
+        It models the individual photons coming in each timestep, at what detector they end up, 
+        whether they are absorbed along the way, how much noise there is, and also whether the 
+        spacecraft the instrument is on wobbles, and possible correction for this.
+
+        Parameters:
+
+        instrument (interferometer class object): Instrument object to be used to simulate observing the image.
+        image (image class object): Image object to be observed.
+        N_f (int): number of fringes we want to consistently see.
+        samples (int): number of samples to use for approximating fresnell difraction pattern.
+        """
         # Useful shorthand
-        self.size = size
+        self.size = image.size
+
+        self.process_photon_energies(instrument, image)
+        self.discretize_E(instrument)
+        self.process_photon_toa(instrument, image)
+        self.discretize_t(instrument)
+
+        #TODO look into using pdf
+        self.process_photon_dpos(instrument, image, N_f, samples)
+        self.discretize_pos(instrument)
 
     def process_photon_energies(self, instrument, image):
         """
@@ -94,14 +117,15 @@ class interferometer_data():
         k = 2 * spc.pi / lambdas
 
         # Randomly selecting a baseline for the photon to go in. Possible #TODO fix this to be more accurate than just random?
-        baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
+        self.baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
+
         # Getting data from those baselines that is necessary for further calculations.
         # Must be done this way since baselines[unacc_ind].W doesn't go element-wise, and .W is not an array operation
         baseline_data = np.array([[instrument.baselines[index].W, 
                                     instrument.baselines[index].F, 
                                     instrument.baselines[index].theta_b,
                                     instrument.baselines[index].D,
-                                    instrument.baselines[index].L] for index in baseline_indices])
+                                    instrument.baselines[index].L] for index in self.baseline_indices])
 
         # Calculating the fresnell diffraction pattern for set number of fringes and samples
         inter_pdf = fre_dif(N_f, samples)
@@ -187,27 +211,3 @@ class interferometer_data():
     def tstep_to_t(self, ins):
         """ Method that turns discretized time steps into the times at the center of their respective steps. """
         return (self.discrete_t + 1) * ins.res_t + ins.toa[0] + ins.res_t / 2
-
-    def process_image(self, instrument, image, N_f, samples):
-        """ 
-        This function is the main function that takes an image and converts it to instrument data as
-        if the instrument had just observed the object te image is a representation of. 
-        It models the individual photons coming in each timestep, at what detector they end up, 
-        whether they are absorbed along the way, how much noise there is, and also whether the 
-        spacecraft the instrument is on wobbles, and possible correction for this.
-
-        Parameters:
-
-        instrument (interferometer class object): Instrument object to be used to simulate observing the image.
-        image (image class object): Image object to be observed.
-        N_f (int): number of fringes we want to consistently see.
-        samples (int): number of samples to use for approximating fresnell difraction pattern.
-        """
-        self.process_photon_energies(instrument, image)
-        self.discretize_E(instrument)
-        self.process_photon_toa(instrument, image)
-        self.discretize_t(instrument)
-
-        #TODO look into using pdf
-        self.process_photon_dpos(instrument, image, N_f, samples)
-        self.discretize_pos(instrument)
