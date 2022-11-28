@@ -170,14 +170,22 @@ def willingale_test():
     plt.show()
 
     for i in range(4):
-        ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
+        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
         analysis.plot_ft(ft_x_data, ft_y_data, 2, i)
     plt.legend()
     plt.show()
 
+    for i in range(4):
+        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
+        analysis.plot_ift(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], ft_y_data, edges, i)
+        # analysis.plot_ft(ft_x_data, ft_y_data, 2, i)
+    plt.legend()
+    plt.show()
+
 if __name__ == "__main__":
+    willingale_test()
     # w_ps_test()
     # Fre_test()
     # scale_test2()
     # discretize_test()
-    willingale_test()
+    pass

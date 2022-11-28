@@ -34,12 +34,12 @@ def ft_data(data):
     Parameters:
     data (interferometer_data class object): Data to be fourier transformed.
     """
-    samples = len(data) // 10
+    samples = len(data)
     y_data, edges = np.histogram(data, samples)
     ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
     ft_y_data = ft.fft(y_data)
 
-    return ft_x_data, ft_y_data
+    return ft_x_data, ft_y_data, edges
 
 def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     """
@@ -59,3 +59,9 @@ def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
 
     # plt.ylim(bottom=samples/10)
     # plt.show()
+
+def plot_ift(data, ft_y_data, edges, num= 0):
+    y_data = abs(ft.ifft(ft_y_data, n=len(data)))
+
+    width_bins = edges[1] - edges[0]
+    plt.plot(y_data, label=f'Baseline {num}')
