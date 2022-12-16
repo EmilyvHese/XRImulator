@@ -71,9 +71,6 @@ class interferometer():
 
         self.baselines = []
 
-        # Pointing directions, starting at 0 (straight at whatever is to be observed)
-        self.pointing = np.zeros(2)
-
         # Roll direction, to support filling out entire u,v plane
         # Standard is pi/2 since the default axis of measurement in literature is the y-axis
         self.roll = 0
@@ -122,8 +119,8 @@ class interferometer():
         return pointing
 
     def smooth_roller(self, pointing):
-
-        pointing[1:, 2] = pointing[:-1, 2] + self.roll_speed * self.res_t
+        indices = np.linspace(0, pointing[:,2].size, pointing[:,2].size)
+        pointing[:, 2] = indices * self.roll_speed * self.res_t
         return pointing
 
     def discrete_roller(self, pointing):

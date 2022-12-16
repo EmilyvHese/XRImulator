@@ -128,12 +128,12 @@ class interferometer_data():
                                     instrument.baselines[index].L] for index in self.baseline_indices])
 
         # Calculating the fresnell diffraction pattern for set number of fringes and samples
-        inter_pdf = fre_dif(N_f, samples)
+        self.inter_pdf = fre_dif(N_f, samples)
 
         # Defining the pointing and off-axis angle for each photon over time #TODO add time dependent pointing
-        pointing = instrument.gen_pointing(np.max(image.toa))
-        theta = (np.cos(pointing[image.toa[:], 2]) * (image.loc[:, 0] + pointing[image.toa[:], 0]) + 
-                    np.sin(pointing[image.toa[:], 2]) * (image.loc[:, 1] + pointing[image.toa[:], 1]))
+        self.pointing = instrument.gen_pointing(np.max(image.toa))
+        theta = (np.cos(self.pointing[image.toa[:], 2]) * (image.loc[:, 0] + self.pointing[image.toa[:], 0]) + 
+                    np.sin(self.pointing[image.toa[:], 2]) * (image.loc[:, 1] + self.pointing[image.toa[:], 1]))
 
         # Doing an accept/reject method to find the precise location photons impact at.
         # It uses a formula from #TODO add reference to that one presentation
@@ -148,9 +148,9 @@ class interferometer_data():
                         - baseline_data[unacc_ind, 0]/2 
                         + baseline_data[unacc_ind, 1] * theta[unacc_ind])
 
-            # Converting y positions to u positions for scaling the fresnell difraction to            
+            # Converting y positions to u positions for scaling the fresnell diffraction to            
             photon_u = photon_y * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
-            photon_fresnell = inter_pdf(photon_u)
+            photon_fresnell = self.inter_pdf(photon_u)
 
             photon_I = np.random.rand(len(unacc_ind)) * 4 * np.amax(photon_fresnell)
 
@@ -206,7 +206,7 @@ class interferometer_data():
         Parameters:
         ins (interferometer-class object): object containing the specifications for discretisation.\n
         """
-        self.discrete_t = (self.toa - self.toa[0]) // ins.res_t
+        self.discrete_t = ((self.toa - self.toa[0]) // ins.res_t).astype(int)
 
     def tstep_to_t(self, ins):
         """ Method that turns discretized time steps into the times at the center of their respective steps. """

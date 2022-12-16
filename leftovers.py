@@ -251,3 +251,37 @@ def wobbler_test(wobble_I, p = False):
 # pix_binner = spinter.interp1d(pix_edges, pix_edges, 'nearest', bounds_error=False)
 
 # self.discrete_pos = ((pix_binner(self.pos[:, 0]) - ins.pos_range[0, 0]) // ins.res_pos) - 1
+
+def image_recon_smooth(data, instrument, pointing, point_binsize):
+    pos_data = data.pixel_to_pos(instrument)[:, 1]
+    time_data = data.discrete_t
+    base_ind = data.baseline_indices
+    
+    fourier_data = np.zeros((len(pos_data), 3))
+    index = 0
+    for roll in np.arange(0, pointing[-1, 2], point_binsize):
+        ind_in_range = (pointing[time_data, 2] > roll) * (pointing[time_data, 2] <= roll + point_binsize)
+        data_bin = pos_data[ind_in_range]
+
+        for i in range(len(instrument.baselines)):
+            data_bin_i = data_bin[base_ind[ind_in_range] == i]
+            samples = data_bin_i.size
+            y_data, edges = np.histogram(data_bin_i, samples)
+
+            ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
+            sampled_freq_range = ((ft_x_data > instrument.baselines[i].D / 1e-10) * (ft_x_data >= instrument.baselines[i].D / 1e-8))
+            sliced_ft_x = ft_x_data[sampled_freq_range]
+            actual_samples = sliced_ft_x.size
+
+            # Calculating u for middle of current bin
+            fourier_data[index:index+actual_samples, 1] = sliced_ft_x * np.cos(roll + point_binsize / 2)
+            # Calculating v for middle of current bin
+            fourier_data[index:index+actual_samples, 2] = sliced_ft_x * np.sin(roll + point_binsize / 2)
+            # Calculating magnitudes of fourier components
+            fourier_data[index:index+actual_samples, 0] = ft.fft(y_data)[sampled_freq_range]
+
+            index += samples
+
+    recon_image = ft.ifft2(fourier_data)
+
+    return fourier_data, recon_image
