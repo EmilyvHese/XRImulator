@@ -1,4 +1,4 @@
-from scipy.fft import ifftn, fftn
+from scipy.fft import ifft2, fft2, fftfreq
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -9,8 +9,8 @@ f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, sharex='col', sharey=
 
 x = np.zeros((N,N))
 x[N//2 - 1:N//2 + 1, N//2 - 1 :N//2 + 1] = 1
-x[N//2 - 1 + 5:N//2 + 1 + 5, N//2 - 1 :N//2 + 1] = 1
-x[N//2 - 1 - 5:N//2 + 1 - 5, N//2 - 1 :N//2 + 1] = 1
+# x[N//2 - 1 + 5:N//2 + 1 + 5, N//2 - 1 :N//2 + 1] = 1
+# x[N//2 - 1 - 5:N//2 + 1 - 5, N//2 - 1 :N//2 + 1] = 1
 ax1.imshow(x, cmap=cm.Greens)
 
 def masker(radius):
@@ -20,15 +20,29 @@ def masker(radius):
         mask[x,y] = 1
     return mask
 
-xf = fftn(x)
-mask = masker(np.array([1, 2, 5, 10, 15, 20, 25, 30, 40, 49]))
+def weird_masker(radius):
+    mask = np.zeros((N,N))
+    for theta in np.arange(0, 2 * np.pi, .01 * np.pi):
+        x, y = np.array(np.cos(theta) * radius, dtype=np.int_), np.array(np.sin(theta) * radius, dtype=np.int_)
+        mask[x,y] = 1
+    return mask
 
+
+xf = fft2(x)
+x_freq = fftfreq(x[:, 0].size, 1)
+y_freq = fftfreq(x[:, 1].size, 1)
+freq = np.zeros((N,N))
+for i, x_val in enumerate(x_freq):
+    for j, y_val in enumerate(y_freq):
+        freq[i, j] = np.random.random()
+mask = weird_masker(np.array([1, 2, 5, 10, 15, 20, 25, 30, 40, 49]))
+
+ax4.imshow(freq, cmap=cm.Greens)
 ax2.imshow(abs(xf * mask), cmap=cm.Oranges)
 ax5.imshow(abs(xf), cmap=cm.Oranges)
-# print(xf)
 
-Z = ifftn(xf)
-Z_mask = ifftn(xf * mask)
+Z = ifft2(freq)
+Z_mask = ifft2(xf * mask)
 ax3.imshow(abs(Z_mask), cmap=cm.Reds)
 ax6.imshow(abs(Z), cmap=cm.Reds)
 

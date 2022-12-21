@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fft as ft
 import scipy.constants as spc
+import scipy.interpolate as spinter
 
 
 def hist_data(data, binsno, pixs = False, num = 0):
@@ -25,7 +26,6 @@ def hist_data(data, binsno, pixs = False, num = 0):
         plt.hist(data * 1e6, binsno, label=f'Baseline {num}')
         plt.xlabel('Detector position (micrometers)')
     plt.ylabel('Counts')
-    # plt.show()
 
 def ft_data(data):
     """
@@ -39,7 +39,6 @@ def ft_data(data):
     y_data, edges = np.histogram(data, samples)
     ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
     ft_y_data = ft.fft(y_data)
-    # print(ft_y_data)
 
     return ft_x_data, ft_y_data, edges
 
@@ -59,52 +58,44 @@ def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     if log == 2:
         plt.loglog(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
 
-    # plt.ylim(bottom=samples/10)
-    # plt.show()
-
 def image_recon_smooth(data, instrument, pointing, point_binsize):
+    # Setting up some necessary parameters
     pos_data = data.pixel_to_pos(instrument)[:, 1]
     time_data = data.discrete_t
     base_ind = data.baseline_indices
+    samples = 512
     
-    fourier_data = np.zeros((pos_data.size, 4), dtype=np.complex_)
-    index = 0
+    # Calculating a grid image of the fourier transformed data that can be 2d-inverse fourier transformed.
+    f_grid = np.zeros((samples, samples), dtype=np.complex_)
+    fft_freqs = ft.fftfreq(samples, instrument.res_pos)
+    fft_freq_ind = np.arange(0, fft_freqs.size, 1, dtype=np.int_)
+    freqs_conv = spinter.interp1d(fft_freqs, fft_freq_ind, kind='nearest')
 
     for roll in np.arange(0, pointing[-1, 2], point_binsize):
+        # Binning data based on roll angle.
         ind_in_range = (pointing[time_data - 1, 2] > roll) * (pointing[time_data - 1, 2] <= roll + point_binsize)
         data_bin = pos_data[ind_in_range]
 
         for i in range(len(instrument.baselines)):
+            # Setting up data for the fourier transform, taking only relevant photons from the current baseline
+            delta_u = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (np.array([1., 1.4]) * 1.602177733e-16 * 10))
             data_bin_i = data_bin[base_ind[ind_in_range] == i]
-            samples = data_bin_i.size
             y_data, edges = np.histogram(data_bin_i, samples)
-            delta_u = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (np.array([1.2, 1.6]) * 1.602177733e-16 * 10))
-
             ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
+
+            # Making a mask to ensure only relevant data is taken
             sampled_freq_range = ((ft_x_data > delta_u[0]) * (ft_x_data <= delta_u[1]))
             sliced_ft_x = ft_x_data[sampled_freq_range]
-            actual_samples = sliced_ft_x.size
 
-            # Calculating magnitudes of fourier components
-            fourier_data[index:index+actual_samples, 0] = ft.fft(y_data)[sampled_freq_range]
             # Calculating u for middle of current bin
-            fourier_data[index:index+actual_samples, 1] = sliced_ft_x * np.cos(roll + point_binsize / 2)
+            u = freqs_conv(sliced_ft_x * np.cos(roll + point_binsize / 2))
             # Calculating v for middle of current bin
-            fourier_data[index:index+actual_samples, 2] = sliced_ft_x * np.sin(roll + point_binsize / 2)
+            v = freqs_conv(sliced_ft_x * np.sin(roll + point_binsize / 2))
+            # Calculating magnitudes of fourier components
+            f_grid[u.astype(int), v.astype(int)] += ft.fft(y_data)[sampled_freq_range]
 
-            fourier_data[index:index+actual_samples, 3] = i
-
-            index += samples
-
-    # u_grid, v_grid = np.meshgrid(fourier_data[:, 1], fourier_data[:, 2], indexing='ij')
-    u_max = 1 / np.sqrt(instrument.baselines[0].L * spc.h * spc.c / (10 * 1.602177733e-16 * 10))
-    f_grid = np.zeros((int(u_max/50), int(u_max/50)), dtype=np.complex_)
-    for i in range(pos_data.size):
-        f_grid[int(fourier_data[i, 1]/100), int(fourier_data[i, 2]/100)] += fourier_data[i, 0]
-
-    recon_image = ft.ifft2(f_grid)
-
-    return fourier_data, recon_image, f_grid
+    # Doing the final inverse fourier transform, and also returning the pre-ifft data.
+    return ft.ifft2(f_grid), f_grid
 
 
     

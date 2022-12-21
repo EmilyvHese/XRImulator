@@ -2,6 +2,7 @@ import numpy as np
 import scipy.special as sps
 import scipy.constants as spc
 import scipy.interpolate as spinter
+import scipy.fft as ft
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
@@ -170,28 +171,30 @@ def willingale_test():
     # plt.legend()
     # plt.show()
 
-    for i in range(4):
-        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
-        analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
-    delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (np.array([1.2, 1.6]) * 1.602177733e-16 * 10))
-    plt.axvline(delta_u[0], 1e-5, 1e4)
-    plt.axvline(delta_u[1], 1e-5, 1e4)
-    plt.legend()
-    plt.xlim(-2 * delta_u[1], 2 * delta_u[1])
-    plt.show()
+    # for i in range(4):
+    #     ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    # delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (np.array([1.2, 1.6]) * 1.602177733e-16 * 10))
+    # plt.axvline(delta_u[0], 1e-5, 1e4)
+    # plt.axvline(delta_u[1], 1e-5, 1e4)
+    # plt.legend()
+    # plt.xlim(-2 * delta_u[1], 2 * delta_u[1])
+    # plt.show()
 
     # test = np.linspace(-4, 4, 1000)
     # plt.plot(test, test_data.inter_pdf(test))
     # plt.show()
 
     ft_data, re_im, f_grid = analysis.image_recon_smooth(test_data, test_I, test_data.pointing, .01 * 2 * np.pi)
-    for i in range(4):
-        ft_base = ft_data[ft_data[:, 3] == i]
-        plt.plot(ft_base[:, 1], ft_base[:, 2], '.', label=f'baseline {i}')
-    plt.legend()
+    # for i in range(4):
+    #     ft_base = ft_data[ft_data[:, 3] == i]
+    #     plt.plot(ft_base[:, 1], ft_base[:, 2], '.', label=f'baseline {i}')
+    # plt.legend()
+    # plt.show()
+
+    plt.imshow(abs(f_grid), cmap=cm.Reds)
     plt.show()
 
-    print(np.amax(f_grid), np.amin(f_grid))
     plt.imshow(abs(re_im), cmap=cm.Greens)
     # plt.plot(re_im[:,0], re_im[:,2], label='0-2')
     # plt.legend()
@@ -200,8 +203,49 @@ def willingale_test():
     # plt.plot(re_im[:,0], re_im[:,1])
     # plt.show()
 
+def image_re_test():
+    image = images.point_source(int(1e5), 0.00, 0, 1.2)
+
+    test_I = instrument.interferometer(.1, .01, 4, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.001, None, instrument.interferometer.smooth_roller, 
+                                        .00001 * 2 * np.pi, 10, np.pi/4)
+    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 512)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    # for i in range(1):
+    #     analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    # plt.legend()
+    # plt.show()
+
+    # for i in range(1):
+    #     ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    # delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (np.array([1.1, 1.3]) * 1.602177733e-16 * 10))
+    # plt.axvline(delta_u[0], 1e-5, 1e4)
+    # plt.axvline(delta_u[1], 1e-5, 1e4)
+    # plt.legend()
+    # plt.xlim(-2 * delta_u[1], 2 * delta_u[1])
+    # plt.show()
+
+    re_im, f_grid = analysis.image_recon_smooth(test_data, test_I, test_data.pointing, .01 * 2 * np.pi)
+
+    plt.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    plt.show()
+
+    plt.imshow(abs(re_im), cmap=cm.Greens)
+    plt.show()
+
 if __name__ == "__main__":
-    willingale_test()
+    # willingale_test()
+    image_re_test()
     # w_ps_test()
     # Fre_test()
     # scale_test2()

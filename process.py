@@ -102,6 +102,8 @@ class interferometer_data():
 
         self.image_toa = image.toa
         self.toa = np.random.normal(self.image_toa, instrument.res_t)
+        # Forcing it to be impossible for photons to arrive late
+        self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
 
     def process_photon_dpos(self, instrument, image, N_f, samples):
         """
