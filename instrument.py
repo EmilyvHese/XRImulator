@@ -4,7 +4,6 @@ It will also contain methods used for manipulating these virtual instruments as 
 """
 
 import numpy as np
-import scipy.interpolate as spinter
 
 class baseline():
     """
