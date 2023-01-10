@@ -58,17 +58,18 @@ def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     if log == 2:
         plt.loglog(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
 
-def image_recon_smooth(data, instrument, point_binsize):
+def image_recon_smooth(data, instrument, point_binsize, samples = 512):
     """
     This function is to be used to reconstruct images from interferometer data.
     Bins input data based on roll angle, which is important to fill out the uv-plane that will be fed into 
-    the inverse fourier transform.
+    the 2d inverse fourier transform.
 
     Args:
         data (interferometer_data class object): The interferometer data to recover an image from.
         instrument (interferometer class object): The interferometer used to record the aforementioned data.
         point_binsize (float): Size of roll angle bins.
-
+        samples (int): N for the NxN matrix that is the uv-plane used for the 2d inverse fourier transform.
+        
     Returns:
         array, array: Two arrays, first of which is the recovered image, second of which is the array used in the ifft.
     """    
@@ -77,7 +78,6 @@ def image_recon_smooth(data, instrument, point_binsize):
     time_data = data.discrete_t
     base_ind = data.baseline_indices
     pointing = data.pointing
-    samples = 512
     
     # Calculating a grid image of the fourier transformed data that can be 2d-inverse fourier transformed.
     f_grid = np.zeros((samples, samples), dtype=np.complex_)
@@ -87,35 +87,25 @@ def image_recon_smooth(data, instrument, point_binsize):
 
     for roll in np.arange(0, pointing[-1, 2], point_binsize):
         # Binning data based on roll angle.
-        ind_in_range = (pointing[time_data - 1, 2] > roll) * (pointing[time_data - 1, 2] <= roll + point_binsize)
+        ind_in_range = (pointing[time_data - 1, 2] >= roll) * (pointing[time_data - 1, 2] < (roll + point_binsize))
         data_bin = pos_data[ind_in_range]
+        base_bin = base_ind[ind_in_range]
 
         for i in range(len(instrument.baselines)):
             # Setting up data for the fourier transform, taking only relevant photons from the current baseline
-            delta_u = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (np.array([1., 1.4]) * 1.602177733e-16 * 10))
-            data_bin_i = data_bin[base_ind[ind_in_range] == i]
+            data_bin_i = data_bin[base_bin == i]
             y_data, edges = np.histogram(data_bin_i, samples)
-            ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
+            centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
-            # Making a mask to ensure only relevant data is taken
-            sampled_freq_range = ((abs(ft_x_data) > delta_u[0]) * (abs(ft_x_data) <= delta_u[1]))
-            sliced_ft_x = ft_x_data[sampled_freq_range]
+            # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
+            freq = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
 
-            # # Calculating u for middle of current bin
-            # print(instrument.baselines[i].D * np.cos(roll + point_binsize / 2) / (spc.h * spc.c / (1.2 * 1.602177733e-16)))
-            # u = freqs_conv(instrument.baselines[i].D * np.cos(roll + point_binsize / 2) / (spc.h * spc.c / (1.2 * 1.602177733e-16)))
-            # # Calculating v for middle of current bin
-            # v = freqs_conv(-instrument.baselines[i].D * np.cos(roll + point_binsize / 2) / (spc.h * spc.c / (1.2 * 1.602177733e-16)))
+            # Calculating u for middle of current bin by taking a projection of the current frequency
+            u = freqs_conv(freq * np.cos(roll + point_binsize / 2))
+            # Calculating v for middle of current bin by taking a projection of the current frequency
+            v = freqs_conv(freq * np.sin(roll + point_binsize / 2))
+            # Calculating magnitude of the fourier transform for the current frequency and bin
+            f_grid[v.astype(int), u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres))
 
-            # Calculating u for middle of current bin
-            u = freqs_conv(sliced_ft_x * np.cos(roll + point_binsize / 2))
-            # Calculating v for middle of current bin
-            v = freqs_conv(sliced_ft_x * np.sin(roll + point_binsize / 2))
-            # Calculating magnitudes of fourier components
-            f_grid[u.astype(int), v.astype(int)] += ft.fft(y_data)[sampled_freq_range]
-
-    # Doing the final inverse fourier transform, and also returning the pre-ifft data.
-    return ft.ifft2(f_grid), f_grid
-
-
-    
+    # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
+    return ft.ifft2(f_grid), f_grid    

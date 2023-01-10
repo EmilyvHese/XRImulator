@@ -24,6 +24,7 @@ class baseline():
         length (float) = length of mirrors, needed to define collecting area (in meters)\n
         #TODO add more relevant parameters
         """
+        #TODO look into using a dict here to make array operations possible
         # Converting all input parameters into self.parameters in SI units.
         self.D = D
         self.L = L
