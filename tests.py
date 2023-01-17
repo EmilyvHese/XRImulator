@@ -204,11 +204,11 @@ def willingale_test():
     # plt.show()
 
 def image_re_test():
-    image = images.double_point_source(int(1e5), [0.002, -0.002], [0., 0.], [1.2, 1.2])
+    image = images.point_source(int(1e6), -0.00, 0.005, 1.2)
 
     test_I = instrument.interferometer(.1, .01, 4, np.array([1.2, 6]), np.array([-400, 400]), 
-                                        0.001, None, instrument.interferometer.smooth_roller, 
-                                        .0001 * 2 * np.pi, 10, np.pi/4)
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .0001 * 2 * np.pi)
     test_I.add_baseline(.035, 2, 300, 1200, 2, 1)
     test_I.add_baseline(.105, 4, 300, 3700, 2, 1)
     test_I.add_baseline(.315, 8, 300, 11100, 2, 1)
@@ -218,31 +218,36 @@ def image_re_test():
     test_data = process.interferometer_data(test_I, image, 10, 512)
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    for i in range(len(test_I.baselines)):
-        analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], 
-                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
-    plt.legend()
-    plt.show()
+    # for i in range(len(test_I.baselines)):
+    #     analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    # plt.legend()
+    # plt.show()
 
-    for i in range(len(test_I.baselines)):
-        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
-        analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
-        delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
-        plt.axvline(delta_u, 1e-5, 1e4)
-        plt.axvline(-delta_u, 1e-5, 1e4)
-    plt.legend()
-    plt.xlim(-4 * delta_u, 4 * delta_u)
-    plt.show()
+    # for i in range(len(test_I.baselines)):
+    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], samples)
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    #     delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
+    #     plt.axvline(delta_u, 1e-5, 1e4)
+    #     plt.axvline(-delta_u, 1e-5, 1e4)
+    # plt.xlim(-4 * delta_u, 4 * delta_u)
+    # plt.legend()
+    # plt.show()
 
     start = time.time()
-    re_im, f_grid = analysis.image_recon_smooth(test_data, test_I, .005 * 2 * np.pi)
+    re_im, f_grid = analysis.image_recon_smooth(test_data, test_I, .01 * 2 * np.pi, 1024)
     print('Reconstructing this image took ', time.time() - start, ' seconds')
 
-    plt.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
-    plt.show()
-
-    plt.imshow(abs(re_im), cmap=cm.Greens)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+    ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane')
+    ax2.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax2.set_title('Beam')
+    ax3.imshow(abs(re_im), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
     plt.show()
 
 if __name__ == "__main__":

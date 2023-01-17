@@ -132,10 +132,16 @@ class interferometer_data():
         # Calculating the fresnell diffraction pattern for set number of fringes and samples
         self.inter_pdf = fre_dif(N_f, samples)
 
-        # Defining the pointing and off-axis angle for each photon over time #TODO add time dependent pointing
+        # Defining the pointing and off-axis angle for each photon over time 
         self.pointing = instrument.gen_pointing(np.max(image.toa))
         theta = (np.cos(self.pointing[image.toa[:], 2]) * (image.loc[:, 0] + self.pointing[image.toa[:], 0]) + 
                     np.sin(self.pointing[image.toa[:], 2]) * (image.loc[:, 1] + self.pointing[image.toa[:], 1]))
+
+        # Quick visualization code
+        # plt.plot(image.toa[:], theta)
+        # plt.plot(image.toa[:], self.pointing[image.toa[:], 2])
+        # plt.plot(image.toa[-1], np.cos(self.pointing[-1, 2]), 'o')
+        # plt.show()
 
         # Doing an accept/reject method to find the precise location photons impact at.
         # It uses a formula from #TODO add reference to that one presentation
@@ -164,13 +170,6 @@ class interferometer_data():
             # Checking which photons will be accepted, and updating the accepted_array accordingly
             accepted_array[unacc_ind] = photon_I < (I * photon_fresnell)
             self.actual_pos[unacc_ind, 1] = photon_y
-
-        # self.noisy_pos = np.random.normal(self.actual_pos[:, 1], instrument.res_pos)
-
-        # Visualization option for pointing progression
-        # pointing *= 360 * 3600 / (2*np.pi)
-        # plt.plot(pointing[:,0], pointing[:,1])
-        # plt.show()
 
     def discretize_E(self, ins):
         """
@@ -212,4 +211,4 @@ class interferometer_data():
 
     def tstep_to_t(self, ins):
         """ Method that turns discretized time steps into the times at the center of their respective steps. """
-        return (self.discrete_t + 1) * ins.res_t + ins.toa[0] + ins.res_t / 2
+        return (self.discrete_t + 1) * ins.res_t + self.toa[0] + ins.res_t / 2

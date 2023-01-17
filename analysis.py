@@ -27,15 +27,15 @@ def hist_data(data, binsno, pixs = False, num = 0):
         plt.xlabel('Detector position (micrometers)')
     plt.ylabel('Counts')
 
-def ft_data(data):
+def ft_data(data, samples):
     """
     Function that fourier transforms given input data from an interferometer.
     Works by first making a histogram of the positional data to then fourier transform that and obtain spatial frequencies.
 
     Parameters:
     data (interferometer_data class object): Data to be fourier transformed.
+    samples (int): Number of samples for the fourier transform to take.
     """
-    samples = len(data)
     y_data, edges = np.histogram(data, samples)
     ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
     ft_y_data = ft.fft(y_data)
@@ -75,7 +75,8 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
     """    
     # Setting up some necessary parameters
     pos_data = data.pixel_to_pos(instrument)[:, 1]
-    time_data = data.discrete_t
+    discrete_data = data.discrete_pos[:, 1]
+    time_data = data.tstep_to_t(instrument).astype(int)
     base_ind = data.baseline_indices
     pointing = data.pointing
     
@@ -85,16 +86,26 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
     fft_freq_ind = np.arange(0, fft_freqs.size, 1, dtype=np.int_)
     freqs_conv = spinter.interp1d(fft_freqs, fft_freq_ind, kind='nearest')
 
-    for roll in np.arange(0, pointing[-1, 2], point_binsize):
+    for roll in np.arange(0, pointing[-1, 2] % (2 * np.pi), point_binsize):
         # Binning data based on roll angle.
-        ind_in_range = (pointing[time_data - 1, 2] >= roll) * (pointing[time_data - 1, 2] < (roll + point_binsize))
+        ind_in_range = (((pointing[time_data, 2] % (2 * np.pi)) >= (roll % (2 * np.pi))) * 
+                            ((pointing[time_data, 2] % (2 * np.pi)) < (((roll + point_binsize) % (2 * np.pi)))))
+
         data_bin = pos_data[ind_in_range]
+        disc_bin = discrete_data[ind_in_range]
         base_bin = base_ind[ind_in_range]
 
+
         for i in range(len(instrument.baselines)):
+
+            if disc_bin.any() == False:
+                print(disc_bin)
+                break
+
             # Setting up data for the fourier transform, taking only relevant photons from the current baseline
             data_bin_i = data_bin[base_bin == i]
-            y_data, edges = np.histogram(data_bin_i, samples)
+            y_data, edges = np.histogram(data_bin_i, int(np.amax(disc_bin[base_bin == i]) - 
+                            np.amin(disc_bin[base_bin == i])) + 1)
             centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
             # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
@@ -106,6 +117,13 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
             v = freqs_conv(freq * np.sin(roll + point_binsize / 2))
             # Calculating magnitude of the fourier transform for the current frequency and bin
             f_grid[v.astype(int), u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres))
+
+        # y_data, edges = np.histogram(data_bin, int(np.amax(disc_bin) - 
+        #                     np.amin(disc_bin)) + 1)
+        # hist_data(data_bin, int(np.amax(disc_bin) - 
+        #                     np.amin(disc_bin)) + 1)
+        # plt.title(roll)
+        # plt.show()
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
     return ft.ifft2(f_grid), f_grid    
