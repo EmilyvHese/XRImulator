@@ -45,7 +45,7 @@ def detected_intensity(theta_b, theta, k, D, y):
     Helper function for process_photon_dpos, that calculates the projected intensity at the detector.
     Written in this way for legibility, by keeping both functions free of clutter.
     """
-    # Functions necessary to calculate I later
+    # Functions necessary to calculate I later (from willingale's paper)
     delta_d = 2 * y * np.sin(theta_b/2) + np.sin(theta) * D
 
     # Projected intensity as a function of y position
@@ -132,10 +132,13 @@ class interferometer_data():
         # Calculating the fresnell diffraction pattern for set number of fringes and samples
         self.inter_pdf = fre_dif(N_f, samples)
 
-        # Defining the pointing and off-axis angle for each photon over time 
+        # Defining the pointing, relative position and off-axis angle for each photon over time.
+        # Relative position is useful for the calculation of theta, since the off-axis angle is very depedent on where the axis is.
+        # There is a 1e-20 factor in a denominator, to prevent divide by zero errors. Typical values for pos_rel are all much larger, 
+        # so this does not simply move the problem.
         self.pointing = instrument.gen_pointing(np.max(image.toa))
-        theta = (np.cos(self.pointing[image.toa[:], 2]) * (image.loc[:, 0] + self.pointing[image.toa[:], 0]) + 
-                    np.sin(self.pointing[image.toa[:], 2]) * (image.loc[:, 1] + self.pointing[image.toa[:], 1]))
+        pos_rel = image.loc - self.pointing[image.toa, :2]
+        theta = np.cos(self.pointing[image.toa, 2] - np.arctan(pos_rel[:, 0] / (pos_rel[:, 1] + 1e-20))) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:,1]**2)
 
         # Quick visualization code
         # plt.plot(image.toa[:], theta)
@@ -144,7 +147,7 @@ class interferometer_data():
         # plt.show()
 
         # Doing an accept/reject method to find the precise location photons impact at.
-        # It uses a formula from #TODO add reference to that one presentation
+        # It uses a formula from #TODO add reference to that one presentation Haniff primer something
         # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
         accepted_array = np.full(image.size, False, bool)
         while np.any(accepted_array == False):
@@ -153,8 +156,7 @@ class interferometer_data():
 
             # Generating new photons for all the unaccepted indices with accurate y-locations and random intensities.
             photon_y = (np.random.rand(len(unacc_ind)) * baseline_data[unacc_ind, 0] 
-                        - baseline_data[unacc_ind, 0]/2 
-                        + baseline_data[unacc_ind, 1] * theta[unacc_ind])
+                        - baseline_data[unacc_ind, 0]/2)
 
             # Converting y positions to u positions for scaling the fresnell diffraction to            
             photon_u = photon_y * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))

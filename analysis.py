@@ -58,7 +58,7 @@ def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     if log == 2:
         plt.loglog(ft.fftshift(ft_x_data), abs(ft.fftshift(ft_y_data)), label=f'Baseline {num}')
 
-def image_recon_smooth(data, instrument, point_binsize, samples = 512):
+def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)), samples = 512):
     """
     This function is to be used to reconstruct images from interferometer data.
     Bins input data based on roll angle, which is important to fill out the uv-plane that will be fed into 
@@ -85,6 +85,7 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
     fft_freqs = ft.fftfreq(samples, instrument.res_pos)
     fft_freq_ind = np.arange(0, fft_freqs.size, 1, dtype=np.int_)
     freqs_conv = spinter.interp1d(fft_freqs, fft_freq_ind, kind='nearest')
+    uv = np.zeros((samples, samples), dtype=int)
 
     for roll in np.arange(0, pointing[-1, 2] % (2 * np.pi), point_binsize):
         # Binning data based on roll angle.
@@ -117,6 +118,11 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
             v = freqs_conv(freq * np.sin(roll + point_binsize / 2))
             # Calculating magnitude of the fourier transform for the current frequency and bin
             f_grid[v.astype(int), u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres))
+            f_grid[-v.astype(int), -u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres))
+
+            if test_data.any():
+                uv[v.astype(int), u.astype(int)] = abs(test_data[v.astype(int), u.astype(int)])
+                uv[-v.astype(int), -u.astype(int)] = abs(test_data[-v.astype(int), -u.astype(int)])            
 
         # y_data, edges = np.histogram(data_bin, int(np.amax(disc_bin) - 
         #                     np.amin(disc_bin)) + 1)
@@ -126,4 +132,4 @@ def image_recon_smooth(data, instrument, point_binsize, samples = 512):
         # plt.show()
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
-    return ft.ifft2(f_grid), f_grid    
+    return ft.ifft2(f_grid), f_grid, uv   

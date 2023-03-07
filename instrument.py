@@ -10,7 +10,7 @@ class baseline():
     This class defines a single baseline in an interferometer object, and is used as a helper for the interferometer class objects as a result.
     """
 
-    def __init__(self, D, L, W, F, theta_g, length):
+    def __init__(self, D, W, F, theta_g, length):
         """ 
         Function that generates a single x-ray interferometer baseline according to given specifications.
         
@@ -27,15 +27,15 @@ class baseline():
         #TODO look into using a dict here to make array operations possible
         # Converting all input parameters into self.parameters in SI units.
         self.D = D
-        self.L = L
-        self.W = W * 10**-6
+        self.W = W * 1e-6
         self.F = F
         self.theta_g = theta_g * 2 * np.pi / 360
         self.length = length
 
         # Calculating some more relevant parameters for ease of access.
-        self.theta_b = D / (2 * F)
+        self.theta_b = D / F
         self.colarea = W * length * 2
+        self.L = self.W / self.theta_b
         
 class interferometer():
     """ 
@@ -156,7 +156,7 @@ class interferometer():
 
         return pointing
 
-    def add_baseline(self, D, L, W, F, theta_g, length):
+    def add_baseline(self, D, W, F, theta_g, length):
         """
         Function that adds a baseline of given parameters to the interferometer object. Call this function multiple times to
         construct a full interferometer capable of actually observing images. Without these, no photons can be measured.
@@ -171,4 +171,4 @@ class interferometer():
         length (float) = length of mirrors, needed to define collecting area (in meters)\n
         #TODO add more relevant parameters
         """
-        self.baselines.append(baseline(D, L, W, F, theta_g, length))
+        self.baselines.append(baseline(D, W, F, theta_g, length))
