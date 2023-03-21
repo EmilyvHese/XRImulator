@@ -4,7 +4,7 @@ import numpy as np
 x = np.linspace(0, 2, 1000)
 y1 = np.sin(x * 10 * 2 * np.pi)
 y2 = np.sin(x * 2  * 2 * np.pi)
-y3 = np.random.random(x.size) * 2 - 1
+y3 = np.random.random(x.size) * 10 - 5
 y4 = y1 + y2 + y3
 
 fig = plt.figure(figsize=(12,6))
@@ -23,7 +23,7 @@ axs[3].set_xlabel('x')
 # Hide x labels and tick labels for all but bottom plot.
 for ax in axs:
     ax.label_outer()
-    ax.set_ylim(-4, 4)
+    ax.set_ylim(-12, 12)
     ax.legend()
     ax.set_ylabel('y')
 

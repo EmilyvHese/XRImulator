@@ -20,14 +20,14 @@ def hist_data(data, binsno, pixs = False, num = 0):
     """
 
     if pixs:
-        plt.hist(data, binsno, label=f'Baseline {num}')
+        histed_data = plt.hist(data, binsno, label=f'Baseline {num}')
         plt.xlabel('Detector position (pixels)')
     else:
-        plt.hist(data * 1e6, binsno, label=f'Baseline {num}')
+        histed_data = plt.hist(data * 1e6, binsno, label=f'Baseline {num}')
         plt.xlabel('Detector position (micrometers)')
     plt.ylabel('Counts')
 
-def ft_data(data, samples):
+def ft_data(y_data, samples, spacing):
     """
     Function that fourier transforms given input data from an interferometer.
     Works by first making a histogram of the positional data to then fourier transform that and obtain spatial frequencies.
@@ -36,11 +36,10 @@ def ft_data(data, samples):
     data (interferometer_data class object): Data to be fourier transformed.
     samples (int): Number of samples for the fourier transform to take.
     """
-    y_data, edges = np.histogram(data, samples)
-    ft_x_data = ft.fftfreq(samples, edges[-1] - edges[-2])
+    ft_x_data = ft.fftfreq(samples, spacing)
     ft_y_data = ft.fft(y_data)
 
-    return ft_x_data, ft_y_data, edges
+    return ft_x_data, ft_y_data / y_data.size
 
 def plot_ft(ft_x_data, ft_y_data, log=0, num= 0):
     """
@@ -85,7 +84,7 @@ def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)
     fft_freqs = ft.fftfreq(samples, instrument.res_pos)
     fft_freq_ind = np.arange(0, fft_freqs.size, 1, dtype=np.int_)
     freqs_conv = spinter.interp1d(fft_freqs, fft_freq_ind, kind='nearest')
-    uv = np.zeros((samples, samples), dtype=int)
+    uv = np.zeros((samples, samples), dtype=np.complex_)
 
     for roll in np.arange(0, pointing[-1, 2] % (2 * np.pi), point_binsize):
         # Binning data based on roll angle.
@@ -110,19 +109,29 @@ def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)
             centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
             # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
-            freq = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
+            freq = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
 
             # Calculating u for middle of current bin by taking a projection of the current frequency
             u = freqs_conv(freq * np.cos(roll + point_binsize / 2))
             # Calculating v for middle of current bin by taking a projection of the current frequency
             v = freqs_conv(freq * np.sin(roll + point_binsize / 2))
             # Calculating magnitude of the fourier transform for the current frequency and bin
-            f_grid[v.astype(int), u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres))
-            f_grid[-v.astype(int), -u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres))
+
+            f_grid[v.astype(int), u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size
+            f_grid[-v.astype(int), -u.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres)) / y_data.size
+
+            # if roll == 0 and i == 0:
+            #     freqs_test = np.linspace(-50000, 50000, int(1e4))
+            #     four_test = np.zeros(freqs_test.size)
+            #     for j, freq_test in enumerate(freqs_test):
+            #         four_test[j] = np.sum(y_data * np.exp(-2j * np.pi * freq_test * centres))
+            #     plt.plot(freqs_test, four_test)
+            #     plt.vlines([-freq, freq], [0, 0], [1e4, 1e4], color='r')
+            #     plt.show()
 
             if test_data.any():
-                uv[v.astype(int), u.astype(int)] = abs(test_data[v.astype(int), u.astype(int)])
-                uv[-v.astype(int), -u.astype(int)] = abs(test_data[-v.astype(int), -u.astype(int)])            
+                uv[v.astype(int), u.astype(int)] = test_data[v.astype(int), u.astype(int)]
+                uv[-v.astype(int), -u.astype(int)] = test_data[-v.astype(int), -u.astype(int)]       
 
         # y_data, edges = np.histogram(data_bin, int(np.amax(disc_bin) - 
         #                     np.amin(disc_bin)) + 1)

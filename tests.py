@@ -2,6 +2,7 @@ import numpy as np
 import scipy.special as sps
 import scipy.constants as spc
 import scipy.interpolate as spinter
+import scipy.stats as spst
 import scipy.fft as ft
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -209,30 +210,36 @@ def image_re_test():
     # Maybe don't even throw it through the sampling
 
     # TODO check fringe generation to be sure
-    image = images.point_source(int(1e5), 0.000, 0.000, 1.2)
+
+    # TODO check with basic sine wave outside normal code
+
+    # TODO Echt echt echt verder kijken naar de fases
+
+    # TODO kijk naar diagnostic codes
+    image = images.double_point_source(int(1e5), [0.0001, -.0001], [0.0001, -.0001], [1.2, 1.2])
 
     test_I = instrument.interferometer(.1, .01, 4, np.array([1.2, 6]), np.array([-400, 400]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
                                         .0005 * 2 * np.pi)
     # test_I.add_baseline(.035, 300, 1200, 2, 1)
     # test_I.add_baseline(.105, 300, 3700, 2, 1)
-    test_I.add_baseline(.315, 300, 11100, 2, 1)
-    test_I.add_baseline(.945, 300, 33400, 2, 1)
+    # test_I.add_baseline(.315, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
     test_data = process.interferometer_data(test_I, image, 10, 512)
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     for i in range(len(test_I.baselines)):
         analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
                             int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
                             np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
         # print(test_I.baselines[i].F / test_I.baselines[i].D)
     # print(exp /33400 * 1e-6)
-    # plt.vlines(-exp, -100, 10000)
+    plt.vlines(-exp, -100, 10000)
     plt.title('Photon impact positions on detector')
-    # plt.ylim(0, 4000)
+    plt.ylim(0, 5000)
     plt.legend()
     plt.show()
 
@@ -263,24 +270,131 @@ def image_re_test():
 
     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
     ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
-    ax1.set_title('UV-plane')
-    ax2.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
-    ax2.set_title('Beam')
+    ax1.set_title('UV-plane (amplitude)')
+    ax2.imshow(abs(1j * ft.fftshift(f_grid)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
     ax3.imshow(abs(re_im), cmap=cm.Greens)
     ax3.set_title('Reconstructed image')
-    ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Greens)
-    ax4.set_title('UV-plane')
-    ax5.imshow(abs(ft.fftshift(test_image)), cmap=cm.Greens)
-    ax5.set_title('Beam')
+    ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.set_title('UV-plane (amplitude)')
+    ax5.imshow(abs(1j * ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.set_title('UV-plane (phase)')
     ax6.imshow(abs(test_image), cmap=cm.Greens)
     ax6.set_title('Reconstructed image')
     plt.show()
 
+def image_re_test_parts():
+    # TODO Try without diffraction, single baseline, with something with a peak at the centre
+    # Try starting simple, add effects until divergence point
+    # Maybe don't even throw it through the sampling
+
+    # TODO check fringe generation to be sure
+
+    # TODO check with basic sine wave outside normal code (histogram replacing photon data)
+
+    # TODO Echt echt echt verder kijken naar de fases
+
+    # TODO kijk naar diagnostic codes
+    # image = images.double_point_source(int(1e6), [0.0002, -0.0002], [0.0002, -0.0002], [1.2, 1.2])
+    image = images.point_source(int(1e5), -0.0002, -0.0002, 1.2)
+
+    test_I = instrument.interferometer(.1, .01, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .0005 * 2 * np.pi)
+    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 512)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    # plt.plot(test_data.test_data)
+    # plt.show()
+
+    exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    for i in range(len(test_I.baselines)):
+        analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
+                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+        # print(test_I.baselines[i].F / test_I.baselines[i].D)
+    # print(exp /33400 * 1e-6)
+    # plt.vlines(-exp, -100, 10000)
+    plt.title('Photon impact positions on detector')
+    # plt.ylim(0, 500)
+    plt.legend()
+    plt.show()
+
+    # test_freq = np.fft.fftfreq(test_data.size)
+    # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
+    # plt.show()
+
+    colourlist = ['b', 'orange', 'g', 'r']
+    for i in range(len(test_I.baselines)):
+        samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+        binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+        ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
+        analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+        delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+        # delta_guess = 10**6 / 30.6
+        plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
+        plt.axvline(-delta_u, 1e-5, 1e4, color = colourlist[i])
+        # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
+        # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
+    plt.xlim(-4 * delta_u, 4 * delta_u)
+    plt.title('Fourier transform of photon positions')
+    plt.xlabel('Spatial frequency ($m^{-1}$)')
+    plt.ylabel('Fourier magnitude')
+    plt.legend()
+    plt.show()
+
+    start = time.time()
+    test_data_imre = np.zeros((512, 512))
+    test_data_imre[256, 256] = 1
+    test_data_imre = ft.fft2(test_data_imre)
+    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .01 * 2 * np.pi, samples=512, test_data=test_data_imre)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    test_image = ft.ifft2(test_data_masked)
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude)')
+    ax2.imshow(abs(ft.fftshift(1j * f_grid)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
+    ax3.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
+    # ax3.plot(256, 256, 'r.')
+    ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.set_title('UV-plane (amplitude)')
+    ax5.imshow(abs(1j * ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.set_title('UV-plane (phase)')
+    ax6.imshow(abs(test_image), cmap=cm.Greens)
+    ax6.set_title('Reconstructed image')
+    plt.show()
+
+def sinety_test():
+    x = np.linspace(0, 5, 1000)
+    y = np.sin(5 * 2 * np.pi * x)
+    four_x, four_y = analysis.ft_data(y, 5/1000)
+    # y_data, edges = np.histogram(data, samples)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    ax1.plot(x, y)
+    ax2.plot(four_x, four_y)
+    ax2.vlines([-5, 5], [-2, -2], [2, 2], colors='r')
+    ax2.set_ylim(-1, 1)
+    plt.show()
+
 if __name__ == "__main__":
     # willingale_test()
-    image_re_test()
+    # image_re_test()
+    image_re_test_parts()
     # w_ps_test()
     # Fre_test()
     # scale_test2()
     # discretize_test()
+    # sinety_test()
     pass

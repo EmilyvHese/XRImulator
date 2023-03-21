@@ -16,41 +16,6 @@ import scipy.interpolate as spinter
 import matplotlib
 import matplotlib.pyplot as plt
 
-def fre_dif(N_f, samples):
-    """
-    Helper function that calculates the fresnell difraction pattern for two overlapping
-    beams such as is the case in the interferometer. Does so according to a specified number
-    of fringes to model out to, and a number of samples to use to interpolate between.
-    """
-    u_0 = np.sqrt(2 * N_f)
-    u_1 = lambda u, u_0: u + u_0/2
-    u_2 = lambda u, u_0: u - u_0/2
-
-    # Times 5 to probe a large area for the later interpolation
-    u = np.linspace(-u_0, u_0, samples) * 5 
-
-    S_1, C_1 = sps.fresnel(u_1(u, u_0))
-    S_2, C_2 = sps.fresnel(u_2(u, u_0))
-
-    A = (C_2 - C_1 + 1j*(S_2 - S_1)) * (1 + np.exp(np.pi * 1j * u_0 * u))
-    A_star = np.conjugate(A)
-
-    I = A * A_star
-    I_pdf = I / sum(I)
-
-    return spinter.interp1d(u, I_pdf, bounds_error=False, fill_value=0)
-
-def detected_intensity(theta_b, theta, k, D, y):
-    """
-    Helper function for process_photon_dpos, that calculates the projected intensity at the detector.
-    Written in this way for legibility, by keeping both functions free of clutter.
-    """
-    # Functions necessary to calculate I later (from willingale's paper)
-    delta_d = 2 * y * np.sin(theta_b/2) + np.sin(theta) * D
-
-    # Projected intensity as a function of y position
-    return 2 + 2 * np.cos(k * delta_d)
-
 class interferometer_data():
     """ 
     Class that serves as a container for interferometer output data.
@@ -85,6 +50,8 @@ class interferometer_data():
         self.process_photon_dpos(instrument, image, N_f, samples)
         self.discretize_pos(instrument)
 
+        self.test_sin()
+
     def process_photon_energies(self, instrument, image):
         """
         This function is a helper function for process_image that specifically processes the energies that photons have and
@@ -113,12 +80,47 @@ class interferometer_data():
         Paramater definitions can be found in process_image.
         """
 
+        def fre_dif(N_f, samples):
+            """
+            Helper function that calculates the fresnell difraction pattern for two overlapping
+            beams such as is the case in the interferometer. Does so according to a specified number
+            of fringes to model out to, and a number of samples to use to interpolate between.
+            """
+            u_0 = np.sqrt(2 * N_f)
+            u_1 = lambda u, u_0: u + u_0/2
+            u_2 = lambda u, u_0: u - u_0/2
+
+            # Times 5 to probe a large area for the later interpolation
+            u = np.linspace(-u_0, u_0, samples) * 5 
+
+            S_1, C_1 = sps.fresnel(u_1(u, u_0))
+            S_2, C_2 = sps.fresnel(u_2(u, u_0))
+
+            A = (C_2 - C_1 + 1j*(S_2 - S_1)) * (1 + np.exp(np.pi * 1j * u_0 * u))
+            A_star = np.conjugate(A)
+
+            I = A * A_star
+            I_pdf = I / sum(I)
+
+            return spinter.interp1d(u, I_pdf, bounds_error=False, fill_value=0)
+
+        def detected_intensity(theta_b, theta, k, D, y):
+            """
+            Helper function for process_photon_dpos, that calculates the projected intensity at the detector.
+            Written in this way for legibility, by keeping both functions free of clutter.
+            """
+            # Functions necessary to calculate I later (from willingale's paper)
+            delta_d = 2 * y * np.sin(theta_b/2) + np.sin(theta) * D
+
+            # Projected intensity as a function of y position
+            return 2 + 2 * np.cos(k * delta_d)
+
         self.actual_pos = np.zeros((self.size, 2))
         # Calculating photon wavelengths and phases from their energies
         lambdas = spc.h * spc.c / image.energies
         k = 2 * spc.pi / lambdas
 
-        # Randomly selecting a baseline for the photon to go in. Possible #TODO fix this to be more accurate than just random?
+        # Randomly selecting a baseline for the photon to go in. 
         self.baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
 
         # Getting data from those baselines that is necessary for further calculations.
@@ -133,11 +135,11 @@ class interferometer_data():
         self.inter_pdf = fre_dif(N_f, samples)
 
         # Defining the pointing, relative position and off-axis angle for each photon over time.
-        # Relative position is useful for the calculation of theta, since the off-axis angle is very depedent on where the axis is.
+        # Relative position is useful for the calculation of theta, since the off-axis angle is very dependent on where the axis is.
         # There is a 1e-20 factor in a denominator, to prevent divide by zero errors. Typical values for pos_rel are all much larger, 
         # so this does not simply move the problem.
         self.pointing = instrument.gen_pointing(np.max(image.toa))
-        pos_rel = image.loc - self.pointing[image.toa, :2]
+        pos_rel = self.pointing[image.toa, :2] - image.loc
         theta = np.cos(self.pointing[image.toa, 2] - np.arctan(pos_rel[:, 0] / (pos_rel[:, 1] + 1e-20))) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:,1]**2)
 
         # Quick visualization code
@@ -159,10 +161,10 @@ class interferometer_data():
                         - baseline_data[unacc_ind, 0]/2)
 
             # Converting y positions to u positions for scaling the fresnell diffraction to            
-            photon_u = photon_y * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
+            photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
             photon_fresnell = self.inter_pdf(photon_u)
 
-            photon_I = np.random.rand(len(unacc_ind)) * 4 * np.amax(photon_fresnell)
+            photon_I = np.random.rand(len(unacc_ind)) * np.amax(photon_fresnell) 
 
             # Calculating the projected intensity with the detected_intensity function
             I = detected_intensity(baseline_data[unacc_ind, 2], 
@@ -170,8 +172,12 @@ class interferometer_data():
                                     baseline_data[unacc_ind, 3], photon_y)
 
             # Checking which photons will be accepted, and updating the accepted_array accordingly
-            accepted_array[unacc_ind] = photon_I < (I * photon_fresnell)
+            accepted_array[unacc_ind] = photon_I < (photon_fresnell)
             self.actual_pos[unacc_ind, 1] = photon_y
+
+        # u_test = np.linspace(-5, 5, 1000)
+        # plt.plot(u_test, self.inter_pdf(u_test))
+        # plt.show()
 
     def discretize_E(self, ins):
         """
@@ -214,3 +220,8 @@ class interferometer_data():
     def tstep_to_t(self, ins):
         """ Method that turns discretized time steps into the times at the center of their respective steps. """
         return (self.discrete_t + 1) * ins.res_t + self.toa[0] + ins.res_t / 2
+
+    def test_sin(self):
+        self.test_data = np.zeros(self.size)
+        for i in range(self.size):
+            self.test_data[i] = np.sin(i * 1500)
