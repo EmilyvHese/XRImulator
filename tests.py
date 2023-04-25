@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
 import matplotlib.cm as cm
+from PIL import Image
+
 
 import images
 import instrument
@@ -284,23 +286,19 @@ def image_re_test():
     plt.show()
 
 def image_re_test_parts():
-    # TODO Try without diffraction, single baseline, with something with a peak at the centre
-    # Try starting simple, add effects until divergence point
-    # Maybe don't even throw it through the sampling
-
-    # TODO check fringe generation to be sure
-
-    # TODO check with basic sine wave outside normal code (histogram replacing photon data)
-
-    # TODO Echt echt echt verder kijken naar de fases
-
     # TODO kijk naar diagnostic codes
-    # image = images.double_point_source(int(1e6), [0.0002, -0.0002], [0.0002, -0.0002], [1.2, 1.2])
-    image = images.point_source(int(1e5), -0.0002, -0.0002, 1.2)
 
-    test_I = instrument.interferometer(.1, .01, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+    # TODO complex images after!
+    # m = 10
+    # locs = np.linspace(0, 2 * np.pi, m)
+    # image = images.m_point_sources(int(1e6), m, [0.000 * np.sin(x) for x in locs], [0.0005 * np.cos(x) for x in locs], [1.2 for x in locs])
+
+    image = images.point_source(int(1e6), 0.000, 0.0005, 1.2)
+    # image = images.double_point_source(int(1e6), [0.000, 0.000], [0.0005, -0.0005], [1.2, 1.2])
+
+    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
-                                        .0005 * 2 * np.pi)
+                                        .00000 * 2 * np.pi, roll_init=4/4 * np.pi)
     # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
     # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
     # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
@@ -312,31 +310,33 @@ def image_re_test_parts():
 
     # plt.plot(test_data.test_data)
     # plt.show()
+    plt.subplot
 
-    exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
-        analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
+        exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+        delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+        analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
                             int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
                             np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
-        # print(test_I.baselines[i].F / test_I.baselines[i].D)
-    # print(exp /33400 * 1e-6)
-    # plt.vlines(-exp, -100, 10000)
-    plt.title('Photon impact positions on detector')
-    # plt.ylim(0, 500)
-    plt.legend()
-    plt.show()
+        plt.vlines(exp, -100, 10000, color=colourlist[i])
+        plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
+        plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
+        plt.ylim(0, 8000)
+        plt.xlim(-200, 200)
+        plt.legend()
+        plt.show()
 
     # test_freq = np.fft.fftfreq(test_data.size)
     # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
     # plt.show()
 
-    colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
         samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
                             np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
         binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
         ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
-        analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+        analysis.plot_ft(ft_x_data, np.abs(ft_y_data), 0, i)
         delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
         # delta_guess = 10**6 / 30.6
         plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
@@ -344,17 +344,104 @@ def image_re_test_parts():
         # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
         # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
     plt.xlim(-4 * delta_u, 4 * delta_u)
-    plt.title('Fourier transform of photon positions')
+    plt.title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
     plt.xlabel('Spatial frequency ($m^{-1}$)')
     plt.ylabel('Fourier magnitude')
     plt.legend()
     plt.show()
 
+    # start = time.time()
+    # test_data_imre = np.zeros((512, 512))
+    # test_data_imre[256, 252:260] = 1
+    # # test_data_imre[261, 261] = 1
+    # # test_data_imre[12, 12] = 1
+    # test_data_imre = ft.fft2(test_data_imre)
+    # re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .002 * 2 * np.pi, samples=[512,512], test_data=test_data_imre, exvfast=1)
+    # print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    # test_image = ft.ifft2(test_data_masked)
+
+    # fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    # ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    # ax1.set_title('UV-plane (amplitude)')
+    # ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
+    # ax2.set_title('UV-plane (phase)')
+    # ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    # ax3.set_title('Reconstructed image')
+    # # ax3.plot(256, 256, 'r.')
+    # ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    # ax4.set_title('UV-plane (amplitude)')
+    # ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    # ax5.set_title('UV-plane (phase)')
+    # ax6.imshow(np.abs(test_image), cmap=cm.Greens)
+    # ax6.set_title('Reconstructed image')
+    # plt.show()
+
+def image_re_test_point():
+    image = images.point_source(int(1e6), 0.0005, 0.000, 1.2)
+
+    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .015 * 2 * np.pi)
+    test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 512)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    # plt.plot(test_data.test_data)
+    # plt.show()
+
+    # colourlist = ['b', 'orange', 'g', 'r']
+    # for i in range(len(test_I.baselines)):
+    #     exp = test_I.baselines[i].F * np.cos(-np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    #     delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+    #     analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] > 0) * (test_data.pointing[test_data.discrete_t, 2] < .1 * np.pi) * (test_data.baseline_indices == i)], 
+    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     plt.vlines(exp, -100, 10000, color=colourlist[i])
+    #     plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
+    #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
+    # # print(exp /33400 * 1e-6)
+    # plt.title('Photon impact positions on detector')
+    # plt.ylim(0, 200)
+    # plt.xlim(-200, 200)
+    # plt.legend()
+    # plt.show()
+
+    # test_freq = np.fft.fftfreq(test_data.size)
+    # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
+    # plt.show()
+
+    # for i in range(len(test_I.baselines)):
+    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+    #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    #     delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+    #     # delta_guess = 10**6 / 30.6
+    #     plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     plt.axvline(-delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
+    #     # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
+    # plt.xlim(-4 * delta_u, 4 * delta_u)
+    # plt.title('Fourier transform of photon positions')
+    # plt.xlabel('Spatial frequency ($m^{-1}$)')
+    # plt.ylabel('Fourier magnitude')
+    # plt.legend()
+    # plt.show()
+
     start = time.time()
     test_data_imre = np.zeros((512, 512))
-    test_data_imre[256, 256] = 1
+    test_data_imre[264, 256] = 1
+    # test_data_imre[261, 261] = 1
+    # test_data_imre[12, 12] = 1
     test_data_imre = ft.fft2(test_data_imre)
-    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .01 * 2 * np.pi, samples=512, test_data=test_data_imre)
+    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=[512, 512], test_data=test_data_imre)
     print('Reconstructing this image took ', time.time() - start, ' seconds')
 
     test_image = ft.ifft2(test_data_masked)
@@ -362,14 +449,14 @@ def image_re_test_parts():
     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
     ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
     ax1.set_title('UV-plane (amplitude)')
-    ax2.imshow(abs(ft.fftshift(1j * f_grid)), cmap=cm.Blues)
+    ax2.imshow(np.imag(ft.fftshift(f_grid)), cmap=cm.Blues)
     ax2.set_title('UV-plane (phase)')
     ax3.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
     ax3.set_title('Reconstructed image')
     # ax3.plot(256, 256, 'r.')
     ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
     ax4.set_title('UV-plane (amplitude)')
-    ax5.imshow(abs(1j * ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.imshow(np.imag(ft.fftshift(test_data_masked)), cmap=cm.Greens)
     ax5.set_title('UV-plane (phase)')
     ax6.imshow(abs(test_image), cmap=cm.Greens)
     ax6.set_title('Reconstructed image')
@@ -388,13 +475,226 @@ def sinety_test():
     ax2.set_ylim(-1, 1)
     plt.show()
 
+def image_re_test_multiple():
+    # image = images.double_point_source(int(1e6), [0.0002, -0.0002], [0.0002, -0.0002], [1.2, 1.2])
+    image1 = images.point_source(int(1e5), 0.0002, 0.0002, 1.2)
+    image2 = images.point_source(int(1e5), -0.0002, -0.0002, 1.2)
+
+    test_I = instrument.interferometer(.1, .01, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .0005 * 2 * np.pi)
+    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data1 = process.interferometer_data(test_I, image1, 10, 512)
+    print('Processing this first image took ', time.time() - start, ' seconds')
+
+    start = time.time()
+    test_data2 = process.interferometer_data(test_I, image2, 10, 512)
+    print('Processing this second image took ', time.time() - start, ' seconds')
+
+    # plt.plot(test_data.test_data)
+    # plt.show()
+
+    # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    # for i in range(len(test_I.baselines)):
+    #     analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
+    # # print(exp /33400 * 1e-6)
+    # # plt.vlines(-exp, -100, 10000)
+    # plt.title('Photon impact positions on detector')
+    # # plt.ylim(0, 500)
+    # plt.legend()
+    # plt.show()
+
+    # test_freq = np.fft.fftfreq(test_data.size)
+    # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
+    # plt.show()
+
+    # colourlist = ['b', 'orange', 'g', 'r']
+    # for i in range(len(test_I.baselines)):
+    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+    #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    #     delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+    #     # delta_guess = 10**6 / 30.6
+    #     plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     plt.axvline(-delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
+    #     # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
+    # plt.xlim(-4 * delta_u, 4 * delta_u)
+    # plt.title('Fourier transform of photon positions')
+    # plt.xlabel('Spatial frequency ($m^{-1}$)')
+    # plt.ylabel('Fourier magnitude')
+    # plt.legend()
+    # plt.show()
+
+    re_im1, f_grid1, test_data_masked = analysis.image_recon_smooth(test_data1, test_I, .01 * 2 * np.pi, samples=512)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    re_im2, f_grid2, test_data_masked = analysis.image_recon_smooth(test_data1, test_I, .01 * 2 * np.pi, samples=512)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    ax1.imshow(abs(ft.fftshift(f_grid1)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude)')
+    ax2.imshow(np.imag(ft.fftshift(f_grid1)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
+    ax3.imshow(abs(ft.fftshift(re_im1)), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
+    ax4.imshow(abs(ft.fftshift(f_grid2)), cmap=cm.Reds)
+    ax4.set_title('UV-plane (amplitude)')
+    ax5.imshow(np.imag(ft.fftshift(f_grid2)), cmap=cm.Blues)
+    ax5.set_title('UV-plane (phase)')
+    ax6.imshow(abs(ft.fftshift(re_im2)), cmap=cm.Greens)
+    ax6.set_title('Reconstructed image')
+
+    plt.show()
+
+def full_image_test(test_code):
+    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\double_wide.png"
+    # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
+    img_scale = .001
+    image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
+    # image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
+
+    histedimage, _, __ = np.histogram2d(image.loc[:,0], image.loc[:,1], np.array([np.linspace(-img_scale/2, img_scale/2, pix_scale[0]), 
+                                                                                  np.linspace(-img_scale/2, img_scale/2, pix_scale[1])]) * 2 * np.pi / (3600 * 360)) 
+    plt.imshow(histedimage, cmap=cm.Greens)
+    plt.xlabel('x-axis angular offset from optical axis (arcsec)')
+    plt.ylabel('y-axis angular offset from optical axis (arcsec)')
+    plt.show()
+
+    # image = images.point_source(int(1e5), 0.000, 0.0005, 1.2)
+
+    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        0.003 * 2 * np.pi, roll_init=0.)
+    test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    # test_I.add_baseline(.05, 10, 300, 1800, 2, 1)
+    # test_I.add_baseline(.001, 10, 300, 20, 2, 1)
+    # test_I.add_baseline(.010, 10, 300, 400, 2, 1)
+    # test_I.add_baseline(.020, 10, 300, 800, 2, 1)
+    # test_I.add_baseline(.005, 10, 300, 100, 2, 1)
+    # test_I.add_baseline(.5, 10, 300, 18000, 2, 1)
+    # test_I.add_baseline(.75, 10, 300, 26000, 2, 1)
+    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    # test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 512)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+    # for i in range(len(test_I.baselines)):
+    #     analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
+    # # print(exp /33400 * 1e-6)
+    # # plt.vlines(-exp, -100, 10000)
+    # plt.title('Photon impact positions on detector')
+    # # plt.ylim(0, 500)
+    # plt.legend()
+    # plt.show()
+
+    # test_freq = np.fft.fftfreq(test_data.size)
+    # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
+    # plt.show()
+
+    # colourlist = ['b', 'orange', 'g', 'r']
+    # for i in range(len(test_I.baselines)):
+    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+    #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
+    #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
+    #     delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+    #     # delta_guess = 10**6 / 30.6
+    #     plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     plt.axvline(-delta_u, 1e-5, 1e4, color = colourlist[i])
+    #     # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
+    #     # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
+    # plt.xlim(-4 * delta_u, 4 * delta_u)
+    # plt.title('Fourier transform of photon positions')
+    # plt.xlabel('Spatial frequency ($m^{-1}$)')
+    # plt.ylabel('Fourier magnitude')
+    # plt.legend()
+    # plt.show()
+
+    start = time.time()
+    test_data_imre = np.array(Image.open(image_path).convert('L'))
+    # plt.imshow(test_data_imre)
+    # plt.show()
+    shap = np.array(test_data_imre.shape)
+    # test_data_imre[np.array(test_data_imre.shape)//2] = 1
+    # test_data_imre[261, 261] = 1
+    # test_data_imre[12, 12] = 1
+    test_data_imre_fft = ft.fft2(test_data_imre)
+    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .01 * 2 * np.pi, 
+                                                                  samples=np.array(test_data_imre.shape), test_data=test_data_imre_fft, exvfast=test_code)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    test_image = ft.ifft2(test_data_masked)
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3)
+    ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude)')
+    ax1.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax1.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax2.imshow(np.imag(ft.fftshift(f_grid)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
+    ax2.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax2.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax3.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
+
+    ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.set_title('UV-plane (amplitude)')
+    ax4.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax4.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax5.imshow(np.imag(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.set_title('UV-plane (phase)')
+    ax5.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax5.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax6.imshow(abs(test_image), cmap=cm.Greens)
+    ax6.set_title('Ifft of masked image')
+
+    ax7.imshow(abs(ft.fftshift(test_data_imre_fft)), cmap=cm.Blues)
+    ax7.set_title('Full UV-plane (amplitude)')
+    ax7.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax7.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax8.imshow(np.imag(ft.fftshift(test_data_imre_fft)), cmap=cm.Greens)
+    ax8.set_title('Full UV-plane (phase)')
+    ax8.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    ax8.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax9.imshow(abs(ft.ifft2(test_data_imre_fft)), cmap=cm.Greens)
+    ax9.set_title('Image')
+    plt.show()
+
+    print('Relative non-zero data points in test data: \n', np.abs(test_data_masked[test_data_masked.nonzero()] / np.amax(test_data_masked[test_data_masked.nonzero()])).astype(float))
+    print('Relative non-zero data points in interferometer data: \n', np.abs(f_grid[f_grid.nonzero()] / np.amax(f_grid[f_grid.nonzero()])).astype(float))
+
 if __name__ == "__main__":
+    #TODO fix times of arrival
     # willingale_test()
     # image_re_test()
-    image_re_test_parts()
+    # image_re_test_multiple()
     # w_ps_test()
     # Fre_test()
     # scale_test2()
     # discretize_test()
     # sinety_test()
+    # full_image_test(0)
+    # image_re_test_point()
+    # image_re_test_parts()
+    full_image_test(1)
     pass

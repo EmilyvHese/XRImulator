@@ -59,7 +59,8 @@ class interferometer_data():
         """
 
         self.image_energies = image.energies
-        self.energies = np.random.normal(self.image_energies, instrument.res_E)
+        # self.energies = np.random.normal(self.image_energies, instrument.res_E)
+        self.energies = self.image_energies
 
     def process_photon_toa(self, instrument, image):
         """
@@ -68,9 +69,10 @@ class interferometer_data():
         """
 
         self.image_toa = image.toa
-        self.toa = np.random.normal(self.image_toa, instrument.res_t)
+        # self.toa = np.random.normal(self.image_toa, instrument.res_t)
         # Forcing it to be impossible for photons to arrive late
-        self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
+        # self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
+        self.toa = self.image_toa
 
     def process_photon_dpos(self, instrument, image, N_f, samples):
         """
@@ -104,21 +106,9 @@ class interferometer_data():
 
             return spinter.interp1d(u, I_pdf, bounds_error=False, fill_value=0)
 
-        def detected_intensity(theta_b, theta, k, D, y):
-            """
-            Helper function for process_photon_dpos, that calculates the projected intensity at the detector.
-            Written in this way for legibility, by keeping both functions free of clutter.
-            """
-            # Functions necessary to calculate I later (from willingale's paper)
-            delta_d = 2 * y * np.sin(theta_b/2) + np.sin(theta) * D
-
-            # Projected intensity as a function of y position
-            return 2 + 2 * np.cos(k * delta_d)
-
         self.actual_pos = np.zeros((self.size, 2))
         # Calculating photon wavelengths and phases from their energies
         lambdas = spc.h * spc.c / image.energies
-        k = 2 * spc.pi / lambdas
 
         # Randomly selecting a baseline for the photon to go in. 
         self.baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
@@ -140,16 +130,9 @@ class interferometer_data():
         # so this does not simply move the problem.
         self.pointing = instrument.gen_pointing(np.max(image.toa))
         pos_rel = self.pointing[image.toa, :2] - image.loc
-        theta = np.cos(self.pointing[image.toa, 2] - np.arctan(pos_rel[:, 0] / (pos_rel[:, 1] + 1e-20))) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:,1]**2)
-
-        # Quick visualization code
-        # plt.plot(image.toa[:], theta)
-        # plt.plot(image.toa[:], self.pointing[image.toa[:], 2])
-        # plt.plot(image.toa[-1], np.cos(self.pointing[-1, 2]), 'o')
-        # plt.show()
+        theta = np.cos(self.pointing[image.toa, 2] - np.arctan2(pos_rel[:, 0], (pos_rel[:, 1] + 1e-20))) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:, 1]**2)
 
         # Doing an accept/reject method to find the precise location photons impact at.
-        # It uses a formula from #TODO add reference to that one presentation Haniff primer something
         # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
         accepted_array = np.full(image.size, False, bool)
         while np.any(accepted_array == False):
@@ -157,27 +140,19 @@ class interferometer_data():
             unacc_ind = np.nonzero(accepted_array == False)[0]
 
             # Generating new photons for all the unaccepted indices with accurate y-locations and random intensities.
-            photon_y = (np.random.rand(len(unacc_ind)) * baseline_data[unacc_ind, 0] 
-                        - baseline_data[unacc_ind, 0]/2)
+            photon_y = (np.random.rand(unacc_ind.size) * baseline_data[unacc_ind, 0] - baseline_data[unacc_ind, 0]/2)
 
             # Converting y positions to u positions for scaling the fresnell diffraction to            
             photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
             photon_fresnell = self.inter_pdf(photon_u)
 
-            photon_I = np.random.rand(len(unacc_ind)) * np.amax(photon_fresnell) 
-
-            # Calculating the projected intensity with the detected_intensity function
-            I = detected_intensity(baseline_data[unacc_ind, 2], 
-                                    theta[unacc_ind], k[unacc_ind], 
-                                    baseline_data[unacc_ind, 3], photon_y)
+            photon_I = np.random.rand(unacc_ind.size) * np.amax(photon_fresnell) 
 
             # Checking which photons will be accepted, and updating the accepted_array accordingly
-            accepted_array[unacc_ind] = photon_I < (photon_fresnell)
+            accepted_array[unacc_ind] = photon_I <= photon_fresnell
             self.actual_pos[unacc_ind, 1] = photon_y
 
-        # u_test = np.linspace(-5, 5, 1000)
-        # plt.plot(u_test, self.inter_pdf(u_test))
-        # plt.show()
+        # self.actual_pos[:, 1] = np.random.choice()
 
     def discretize_E(self, ins):
         """

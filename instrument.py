@@ -45,7 +45,7 @@ class interferometer():
 
     def __init__(self, res_E, res_t, res_pos, E_range, pos_range, 
                     wobble_I = 0., wobble_c = None, 
-                    roller = None, roll_speed = 0., roll_stop_t = 0., roll_stop_a = 0.):
+                    roller = None, roll_speed = 0., roll_stop_t = 0., roll_stop_a = 0., roll_init = 0.):
         """ 
         Function that generates a virtual x-ray interferometer according to given specifications.
         
@@ -90,6 +90,7 @@ class interferometer():
         self.roll_speed = roll_speed
         self.roll_stop_t = roll_stop_t
         self.roll_stop_a = roll_stop_a
+        self.roll_init = roll_init
 
     def update_D(self):
         """ Function that updates the baseline towards the target baseline on a single timestep. """
@@ -119,14 +120,42 @@ class interferometer():
         return pointing
 
     def smooth_roller(self, pointing):
-        indices = np.linspace(0, pointing[:,2].size, pointing[:,2].size)
-        pointing[:, 2] = indices * self.roll_speed * self.res_t
+        """
+        Function that generates the roll portion of the pointing data for the instrument. 
+        This function is used for a continuous model of rolling the instrument, with a predefied roll
+        velocity.
+
+        Parameters:
+
+        pointing (array): 3d array of pointing angles as deviations from observation start for every observational timestep.
+
+        Returns:
+
+        pointing (array): That same, but now with roll data.
+        """
+        pointing[:, 2] = (np.arange(pointing[:, 2].size) * self.roll_speed * self.res_t) + self.roll_init
         return pointing
 
     def discrete_roller(self, pointing):
-        time_to_move = self.roll_stop_t // self.res_t
+        """
+        Function that generates the roll portion of the pointing data for the instrument. 
+        This function is used for a discrete model of rolling the instrument, with starts and stops
+        at specified roll angle intervals.
+
+        Parameters:
+
+        pointing (array): 3d array of pointing angles as deviations from observation start for every observational timestep.
+
+        Returns:
+
+        pointing (array): That same, but now with roll data.
+        """
+        # Calculates the stopping interval in timestep units 
+        time_to_move = self.roll_stop_t // self.res_t 
+        # The angle over which to move after the stopping interval
         angle_to_move = self.roll_stop_a
-        for i, a in enumerate(pointing[:, 2]):
+
+        for i in pointing[:, 2]:
             t_to_move = i - time_to_move
 
             if t_to_move > 0.:
@@ -134,6 +163,7 @@ class interferometer():
             else:
                 pointing[i, 2] = pointing[i - 1, 2]
 
+            # Defining the next timestep to move at and angle to move to.
             if pointing[i, 2] > angle_to_move:
                 angle_to_move += self.roll_stop_a
                 time_to_move += self.roll_stop_t // self.res_t
@@ -143,14 +173,15 @@ class interferometer():
     # TODO look at integrating input data as pointing data
     def gen_pointing(self, t_exp):
         """ 
-        This function generates a pointing vector for each time step in an observation
+        This function generates a 3d pointing vector for each time step in an observation. It consists of 
+        three angles, the pitch, yaw and roll. The first two are linked and generated together by the wobbler 
+        function, while the roll is fundamentally different and thus generated differently.
         """
-        pointing = np.zeros((int(t_exp / self.res_t) + 1, 3))
+        pointing = np.zeros((t_exp + 2, 3))
+        pointing = self.roller(self, pointing)
+
         if self.wobble_I:
             pointing = self.wobbler(pointing)
-
-        if self.roll_speed:
-            pointing = self.roller(self, pointing)
 
         if self.wobble_c:
             pass
