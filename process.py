@@ -146,6 +146,9 @@ class interferometer_data():
             photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
             photon_fresnell = self.inter_pdf(photon_u)
 
+            # plt.plot(photon_u, photon_fresnell, '.')
+            # plt.show()
+
             photon_I = np.random.rand(unacc_ind.size) * np.amax(photon_fresnell) 
 
             # Checking which photons will be accepted, and updating the accepted_array accordingly
@@ -176,7 +179,7 @@ class interferometer_data():
         Parameters:
         ins (interferometer-class object): object containing the specifications for discretisation.\n
         """
-        self.discrete_pos = (self.actual_pos - ins.pos_range[0]) // ins.res_pos
+        self.discrete_pos = (self.actual_pos - ins.pos_range[0]) // ins.res_pos 
         
     def pixel_to_pos(self, ins):
         """ Method that turns discretized positions into the positions at the center of their respective pixels. """

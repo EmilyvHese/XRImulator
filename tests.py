@@ -285,38 +285,72 @@ def image_re_test():
     ax6.set_title('Reconstructed image')
     plt.show()
 
-def image_re_test_parts():
-    # TODO kijk naar diagnostic codes
+def stats_test():
+    """This test exists to do some statistical testing"""
+    offset = 0e-6
+    image = images.point_source(int(1e5), 0.000, offset, 1.2)
 
-    # TODO complex images after!
+    no_sims = 100
+    simulated = np.zeros((no_sims, 4), dtype=np.complex_)
+    masked = np.zeros((no_sims, 4), dtype=np.complex_)
+
+    for sim in range(no_sims):
+        test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                            0.00, None, instrument.interferometer.smooth_roller, 
+                                            .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+        test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+        test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+        # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+        # test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+        test_data = process.interferometer_data(test_I, image, 10, 512)
+
+        test_data_imre = np.zeros((512, 512))
+        test_data_imre[256, 256] = 1
+        test_data_imre_fft = ft.fft2(test_data_imre)
+        re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=test_data_imre.shape, test_data=test_data_imre_fft, exvfast=0)
+
+        simulated[sim] = f_grid[f_grid.nonzero()] / np.sum(np.abs(f_grid[f_grid.nonzero()]))
+        masked[sim] = test_data_masked[f_grid.nonzero()] / np.sum(np.abs(test_data_masked[f_grid.nonzero()]))
+
+        if sim % 10 == 0:
+            print(f'Done with sim {sim}')
+
+    print(f'Average amplitude of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.abs(simulated), axis=0)} +/- {np.std(np.abs(simulated), axis=0) / no_sims}')
+    print(f'Average phase of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.angle(simulated), axis=0)} +/- {np.std(np.angle(simulated), axis=0) / no_sims}')
+    print(f'Average amplitude of {no_sims} normalised nonzero points in masked plane: {np.mean(np.abs(masked), axis=0)}  +/- {np.std(np.abs(masked), axis=0) / no_sims}')
+    print(f'Average phase of {no_sims} normalised nonzero points in masked plane: {np.mean(np.angle(masked), axis=0)}  +/- {np.std(np.angle(masked), axis=0) / no_sims}')
+    
+def image_re_test_uv():
     # m = 10
     # locs = np.linspace(0, 2 * np.pi, m)
     # image = images.m_point_sources(int(1e6), m, [0.000 * np.sin(x) for x in locs], [0.0005 * np.cos(x) for x in locs], [1.2 for x in locs])
 
-    image = images.point_source(int(1e6), 0.000, 0.0005, 1.2)
+    offset = 0e-6
+    image = images.point_source(int(1e6), 0.000, offset, 1.2)
     # image = images.double_point_source(int(1e6), [0.000, 0.000], [0.0005, -0.0005], [1.2, 1.2])
 
     test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
-                                        .00000 * 2 * np.pi, roll_init=4/4 * np.pi)
-    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
     # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
     # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
-    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+    # test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 512)
+    test_data = process.interferometer_data(test_I, image, 10, 1024)
     print('Processing this image took ', time.time() - start, ' seconds')
-
-    # plt.plot(test_data.test_data)
-    # plt.show()
-    plt.subplot
 
     colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
         exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
         delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-        analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+        # analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+        #                     int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+        #                     np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+        print(int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1)
+        analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
                             int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
                             np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
         plt.vlines(exp, -100, 10000, color=colourlist[i])
@@ -335,47 +369,189 @@ def image_re_test_parts():
         samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
                             np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
         binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+        centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+        print(centres)
         ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
-        analysis.plot_ft(ft_x_data, np.abs(ft_y_data), 0, i)
+
+        fig, (ax1, ax2) = plt.subplots(2,1)
         delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-        # delta_guess = 10**6 / 30.6
-        plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
-        plt.axvline(-delta_u, 1e-5, 1e4, color = colourlist[i])
-        # plt.axvline(delta_guess, 1e-5, 1e4, color = 'r')
-        # plt.axvline(-delta_guess, 1e-5, 1e4, color = 'r')
-    plt.xlim(-4 * delta_u, 4 * delta_u)
-    plt.title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
-    plt.xlabel('Spatial frequency ($m^{-1}$)')
-    plt.ylabel('Fourier magnitude')
-    plt.legend()
+        exact = (np.sum(binned_data * np.exp(-2j * np.pi * -delta_u * centres)) / binned_data.size, np.sum(binned_data * np.exp(-2j * np.pi * delta_u * centres)) / binned_data.size)
+        fig.suptitle(f'Exact values for amplitude: {np.round(np.abs(exact), 5)}, for phase: {np.round(np.angle(exact), 5)} at offset {np.round(offset, 6)} \"')
+
+        print(exact, np.abs(exact), np.angle(exact))
+
+        analysis.plot_ft(ft_x_data, np.abs(ft_y_data), ax1, 0, i)
+        ax1.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
+        ax1.axvline(-delta_u, 1e-5, 1e4, color = 'k')
+        ax1.plot([-delta_u, delta_u], np.abs(exact), 'ro', label='Exact value')
+        ax1.set_xlim(-4 * delta_u, 4 * delta_u)
+        ax1.set_title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
+        ax1.set_xlabel('Spatial frequency ($m^{-1}$)')
+        ax1.set_ylabel('Fourier magnitude')
+        ax1.legend()
+
+        analysis.plot_ft(ft_x_data, np.angle(ft_y_data), ax2, 0, i)
+        ax2.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
+        ax2.axvline(-delta_u, 1e-5, 1e4, color = 'k')
+        ax2.plot([-delta_u, delta_u], np.angle(exact), 'ro', label='Exact value')
+        ax2.set_xlim(-4 * delta_u, 4 * delta_u)
+        ax2.set_title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
+        ax2.set_xlabel('Spatial frequency ($m^{-1}$)')
+        ax2.set_ylabel('Fourier phase')
+        ax2.legend()
+
+    # plt.show()
+
+    start = time.time()
+    test_data_imre = np.zeros((512, 512))
+    test_data_imre[256, 256] = 1
+    # test_data_imre[12, 12] = 1
+    test_data_imre_fft = ft.fft2(test_data_imre)
+    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=test_data_imre.shape, test_data=test_data_imre_fft, exvfast=0)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    test_image = ft.ifft2(test_data_masked)
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3)
+    ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude)')
+    ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
+    ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
+    # ax3.plot(256, 256, 'r.')
+    ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.set_title('UV-plane (amplitude)')
+    ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.set_title('UV-plane (phase)')
+    ax6.imshow(np.abs(test_image), cmap=cm.Greens)
+    ax6.set_title('Reconstructed image')
+
+    ax7.imshow(np.abs(ft.fftshift(test_data_imre_fft)), cmap=cm.Blues)
+    ax7.set_title('Full UV-plane (amplitude)')
+    # ax7.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax7.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax8.imshow(np.angle(ft.fftshift(test_data_imre_fft)), cmap=cm.Greens)
+    ax8.set_title('Full UV-plane (phase)')
+    # ax8.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax8.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax9.imshow(np.abs(ft.ifft2(test_data_imre_fft)), cmap=cm.Greens)
+    ax9.set_title('Image')
     plt.show()
 
-    # start = time.time()
-    # test_data_imre = np.zeros((512, 512))
-    # test_data_imre[256, 252:260] = 1
-    # # test_data_imre[261, 261] = 1
-    # # test_data_imre[12, 12] = 1
-    # test_data_imre = ft.fft2(test_data_imre)
-    # re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .002 * 2 * np.pi, samples=[512,512], test_data=test_data_imre, exvfast=1)
-    # print('Reconstructing this image took ', time.time() - start, ' seconds')
+    print(f'Normalised nonzero points in interferometer plane: {f_grid[f_grid.nonzero()] / np.sum(np.abs(f_grid[f_grid.nonzero()]))}')
+    print(f'Normalised nonzero points in masked plane: {test_data_masked[f_grid.nonzero()] / np.sum(np.abs(test_data_masked[f_grid.nonzero()]))}')
 
-    # test_image = ft.ifft2(test_data_masked)
+def image_re_test_parts():
+    # m = 10
+    # locs = np.linspace(0, 2 * np.pi, m)
+    # image = images.m_point_sources(int(1e6), m, [0.000 * np.sin(x) for x in locs], [0.0005 * np.cos(x) for x in locs], [1.2 for x in locs])
 
-    # fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
-    # ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
-    # ax1.set_title('UV-plane (amplitude)')
-    # ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
-    # ax2.set_title('UV-plane (phase)')
-    # ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
-    # ax3.set_title('Reconstructed image')
-    # # ax3.plot(256, 256, 'r.')
-    # ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
-    # ax4.set_title('UV-plane (amplitude)')
-    # ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
-    # ax5.set_title('UV-plane (phase)')
-    # ax6.imshow(np.abs(test_image), cmap=cm.Greens)
-    # ax6.set_title('Reconstructed image')
+    #TODO look at digitize function
+
+    #TODO look at testing with sinusoid instead of point source
+
+    offset = 0e-6
+    image = images.point_source(int(1e6), 0.000, offset, 1.2)
+    # image = images.double_point_source(int(1e6), [0.000, 0.000], [0.0005, -0.0005], [1.2, 1.2])
+
+    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
+    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 512)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    # plt.plot(test_data.test_data)
     # plt.show()
+    plt.subplot
+
+    colourlist = ['b', 'orange', 'g', 'r']
+    for i in range(len(test_I.baselines)):
+        exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+        delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+        analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+        plt.vlines(exp, -100, 10000, color=colourlist[i])
+        plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
+        plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
+        plt.ylim(0, 8000)
+        plt.xlim(-200, 200)
+        plt.legend()
+        plt.show()
+
+    # test_freq = np.fft.fftfreq(test_data.size)
+    # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
+    # plt.show()
+
+    for i in range(len(test_I.baselines)):
+        samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
+                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+        binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+        centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+        ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
+
+        fig, (ax1, ax2) = plt.subplots(2,1)
+        delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+        exact = (np.sum(binned_data * np.exp(-2j * np.pi * -delta_u * centres)) / binned_data.size, np.sum(binned_data * np.exp(-2j * np.pi * delta_u * centres)) / binned_data.size)
+        fig.suptitle(f'Exact values for amplitude: {np.round(np.abs(exact), 5)}, for phase: {np.round(np.angle(exact), 5)} at offset {np.round(offset, 6)} \"')
+
+        print(exact, np.abs(exact), np.angle(exact))
+
+        analysis.plot_ft(ft_x_data, np.abs(ft_y_data), ax1, 0, i)
+        ax1.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
+        ax1.axvline(-delta_u, 1e-5, 1e4, color = 'k')
+        ax1.plot([-delta_u, delta_u], np.abs(exact), 'ro', label='Exact value')
+        ax1.set_xlim(-4 * delta_u, 4 * delta_u)
+        ax1.set_title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
+        ax1.set_xlabel('Spatial frequency ($m^{-1}$)')
+        ax1.set_ylabel('Fourier magnitude')
+        ax1.legend()
+
+        analysis.plot_ft(ft_x_data, np.angle(ft_y_data), ax2, 0, i)
+        ax2.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
+        ax2.axvline(-delta_u, 1e-5, 1e4, color = 'k')
+        ax2.plot([-delta_u, delta_u], np.angle(exact), 'ro', label='Exact value')
+        ax2.set_xlim(-4 * delta_u, 4 * delta_u)
+        ax2.set_title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
+        ax2.set_xlabel('Spatial frequency ($m^{-1}$)')
+        ax2.set_ylabel('Fourier phase')
+        ax2.legend()
+
+    plt.show()
+
+    start = time.time()
+    test_data_imre = np.zeros((512, 512))
+    test_data_imre[256, 256] = 1
+    # test_data_imre[261, 261] = 1
+    # test_data_imre[12, 12] = 1
+    test_data_imre = ft.fft2(test_data_imre)
+    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=[512,512], test_data=test_data_imre, exvfast=0)
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    test_image = ft.ifft2(test_data_masked)
+
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude)')
+    ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
+    ax2.set_title('UV-plane (phase)')
+    ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax3.set_title('Reconstructed image')
+    # ax3.plot(256, 256, 'r.')
+    ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.set_title('UV-plane (amplitude)')
+    ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    ax5.set_title('UV-plane (phase)')
+    ax6.imshow(np.abs(test_image), cmap=cm.Greens)
+    ax6.set_title('Reconstructed image')
+    plt.show()
 
 def image_re_test_point():
     image = images.point_source(int(1e6), 0.0005, 0.000, 1.2)
@@ -463,16 +639,99 @@ def image_re_test_point():
     plt.show()
 
 def sinety_test():
-    x = np.linspace(0, 5, 1000)
-    y = np.sin(5 * 2 * np.pi * x)
-    four_x, four_y = analysis.ft_data(y, 5/1000)
+    f = 4.387
+    phase = np.pi / 4.5
+    xend = 3.17
+    samples = 1000
+
+    x = np.linspace(0, xend, samples)
+    y = np.cos(f * 2 * np.pi * x + phase)
+    four_x, fast_y = analysis.ft_data(y, samples, xend/samples)
+    four_x = np.fft.fftshift(four_x)
+    
+    exact_y = np.zeros(four_x.size, dtype=np.complex_)
+    for i, freq in enumerate(four_x):
+        exact_y[i] = np.sum(y * np.exp(-2j * np.pi * freq * x)) / y.size
+
+    fast_y = np.fft.fftshift(fast_y)
     # y_data, edges = np.histogram(data, samples)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
     ax1.plot(x, y)
-    ax2.plot(four_x, four_y)
-    ax2.vlines([-5, 5], [-2, -2], [2, 2], colors='r')
+    ax1.set_ylim(-3, 3)
+    ax1.set_title(f'Cosine with frequency pi and phase {phase / np.pi} pi')
+
+    ax2.plot(four_x, np.abs(fast_y), '--', label='Fast')
+    ax2.plot(four_x, np.abs(exact_y), '-.', label='Exact')
+    ax2.plot([-f, f], [np.abs(np.sum(y * np.exp(-2j * np.pi * -f * x)) / y.size), np.abs(np.sum(y * np.exp(-2j * np.pi * f * x)) / y.size)], 'ro', label='Extra exact')
+
+    # ax2.vlines([-5, 5], [-2, -2], [2, 2], colors='r')
     ax2.set_ylim(-1, 1)
+    ax2.set_xlim(-6, 6)
+    ax2.set_title('Amplitude of fourier transform')
+    ax2.legend()
+
+    ax3.plot(four_x, np.angle(fast_y), '--', label='Fast')
+    ax3.plot(four_x, np.angle(exact_y), '-.', label='Exact')
+    ax3.plot(four_x, np.angle(exact_y), '.', label='Exact')
+    ax3.plot(four_x, [phase for i in four_x], 'r:', label='Phase')
+    ax3.plot(four_x, [-phase for i in four_x], 'r:')
+    ax3.plot([-f, f], [np.angle(np.sum(y * np.exp(-2j * np.pi * -f * x)) / y.size), np.angle(np.sum(y * np.exp(-2j * np.pi * f * x)) / y.size)], 'ro', label='Extra exact')
+    ax3.set_ylim(-np.pi, np.pi)
+    ax3.set_xlim(-6, 6)
+    ax3.set_title('Phase of fourier transform')
+    ax3.legend()
+    plt.show()
+
+
+def sinetier_test():
+    f = 4.387
+    phase = np.pi / 4.5
+    xend = 3.17
+    samples = 1000
+
+    x = np.linspace(0, xend, samples)
+    y = np.cos(f * 2 * np.pi * x + phase)
+    four_x, fast_y = analysis.ft_data(y, samples, xend/samples)
+    four_x = np.fft.fftshift(four_x)
+    
+    exact_y = np.zeros(four_x.size, dtype=np.complex_)
+    for i, freq in enumerate(four_x):
+        exact_y[i] = np.sum(y * np.exp(-2j * np.pi * freq * x)) / y.size
+
+    fast_y = np.fft.fftshift(fast_y)
+    # y_data, edges = np.histogram(data, samples)
+
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+    ax1.plot(x, y)
+    ax1.set_ylim(-3, 3)
+    ax1.set_title(f'Cosine with frequency pi and phase {phase / np.pi} pi')
+
+    ax2.plot(four_x, np.abs(fast_y), '--', label='Fast')
+    ax2.plot(four_x, np.abs(exact_y), '-.', label='Exact')
+    ax2.plot([-f, f], [np.abs(np.sum(y * np.exp(-2j * np.pi * -f * x)) / y.size), np.abs(np.sum(y * np.exp(-2j * np.pi * f * x)) / y.size)], 'ro', label='Extra exact')
+
+    # ax2.vlines([-5, 5], [-2, -2], [2, 2], colors='r')
+    ax2.set_ylim(-1, 1)
+    ax2.set_xlim(-6, 6)
+    ax2.set_title('Amplitude of fourier transform')
+    ax2.legend()
+
+    ax3.plot(x, np.fft.ifft(np.fft.fftshift(fast_y)), '--', label='Fast')
+    ax3.plot(x, np.fft.ifft(np.fft.fftshift(exact_y)), '-.', label='Exact')
+    ax3.set_title('Reconstructed cosine')
+    ax3.legend()
+
+    ax4.plot(four_x, np.angle(fast_y), '--', label='Fast')
+    ax4.plot(four_x, np.angle(exact_y), '-.', label='Exact')
+    ax4.plot(four_x, np.angle(exact_y), '.', label='Exact')
+    ax4.plot(four_x, [phase for i in four_x], 'r:', label='Phase')
+    ax4.plot(four_x, [-phase for i in four_x], 'r:')
+    ax4.plot([-f, f], [np.angle(np.sum(y * np.exp(-2j * np.pi * -f * x)) / y.size), np.angle(np.sum(y * np.exp(-2j * np.pi * f * x)) / y.size)], 'ro', label='Extra exact')
+    ax4.set_ylim(-np.pi, np.pi)
+    ax4.set_xlim(-6, 6)
+    ax4.set_title('Phase of fourier transform')
+    ax4.legend()
     plt.show()
 
 def image_re_test_multiple():
@@ -559,7 +818,7 @@ def image_re_test_multiple():
     plt.show()
 
 def full_image_test(test_code):
-    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\double_wide.png"
+    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
     # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
     img_scale = .001
     image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
@@ -578,16 +837,16 @@ def full_image_test(test_code):
                                         0.00, None, instrument.interferometer.smooth_roller, 
                                         0.003 * 2 * np.pi, roll_init=0.)
     test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
-    # test_I.add_baseline(.05, 10, 300, 1800, 2, 1)
-    # test_I.add_baseline(.001, 10, 300, 20, 2, 1)
-    # test_I.add_baseline(.010, 10, 300, 400, 2, 1)
-    # test_I.add_baseline(.020, 10, 300, 800, 2, 1)
-    # test_I.add_baseline(.005, 10, 300, 100, 2, 1)
-    # test_I.add_baseline(.5, 10, 300, 18000, 2, 1)
-    # test_I.add_baseline(.75, 10, 300, 26000, 2, 1)
-    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
-    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
-    # test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+    test_I.add_baseline(.05, 10, 300, 1800, 2, 1)
+    test_I.add_baseline(.001, 10, 300, 20, 2, 1)
+    test_I.add_baseline(.010, 10, 300, 400, 2, 1)
+    test_I.add_baseline(.020, 10, 300, 800, 2, 1)
+    test_I.add_baseline(.005, 10, 300, 100, 2, 1)
+    test_I.add_baseline(.5, 10, 300, 18000, 2, 1)
+    test_I.add_baseline(.75, 10, 300, 26000, 2, 1)
+    test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
+    test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
+    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
     test_data = process.interferometer_data(test_I, image, 10, 512)
@@ -646,42 +905,60 @@ def full_image_test(test_code):
     test_image = ft.ifft2(test_data_masked)
 
     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3)
-    ax1.imshow(abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
     ax1.set_title('UV-plane (amplitude)')
-    ax1.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax1.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax2.imshow(np.imag(ft.fftshift(f_grid)), cmap=cm.Blues)
+    # ax1.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax1.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
     ax2.set_title('UV-plane (phase)')
-    ax2.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax2.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax3.imshow(abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    # ax2.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax2.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
     ax3.set_title('Reconstructed image')
 
-    ax4.imshow(abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
     ax4.set_title('UV-plane (amplitude)')
-    ax4.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax4.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax5.imshow(np.imag(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    # ax4.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax4.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
     ax5.set_title('UV-plane (phase)')
-    ax5.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax5.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax6.imshow(abs(test_image), cmap=cm.Greens)
+    # ax5.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax5.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax6.imshow(np.abs(test_image), cmap=cm.Greens)
     ax6.set_title('Ifft of masked image')
 
-    ax7.imshow(abs(ft.fftshift(test_data_imre_fft)), cmap=cm.Blues)
+    ax7.imshow(np.abs(ft.fftshift(test_data_imre_fft)), cmap=cm.Blues)
     ax7.set_title('Full UV-plane (amplitude)')
-    ax7.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax7.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax8.imshow(np.imag(ft.fftshift(test_data_imre_fft)), cmap=cm.Greens)
+    # ax7.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax7.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax8.imshow(np.angle(ft.fftshift(test_data_imre_fft)), cmap=cm.Greens)
     ax8.set_title('Full UV-plane (phase)')
-    ax8.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
-    ax8.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax9.imshow(abs(ft.ifft2(test_data_imre_fft)), cmap=cm.Greens)
+    # ax8.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
+    # ax8.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
+    ax9.imshow(np.abs(ft.ifft2(test_data_imre_fft)), cmap=cm.Greens)
     ax9.set_title('Image')
     plt.show()
 
-    print('Relative non-zero data points in test data: \n', np.abs(test_data_masked[test_data_masked.nonzero()] / np.amax(test_data_masked[test_data_masked.nonzero()])).astype(float))
-    print('Relative non-zero data points in interferometer data: \n', np.abs(f_grid[f_grid.nonzero()] / np.amax(f_grid[f_grid.nonzero()])).astype(float))
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    # Look at different normalisations`
+    rel_grid = test_data_masked / np.sum(test_data_masked) - f_grid / np.sum(f_grid)
+
+    ax1.imshow(np.abs(ft.fftshift(rel_grid)), cmap=cm.Reds)
+    ax1.set_title('UV-plane (amplitude difference)')
+    ax1.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
+    ax1.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
+
+    ax2.imshow(np.angle(ft.fftshift(rel_grid)), cmap=cm.Greens)
+    ax2.set_title('UV-plane (phase difference)')
+    ax2.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
+    ax2.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
+    # ax3.imshow(np.abs(ft.ifft2(rel_grid)))
+    # ax3.set_title('Image difference')
+
+    plt.show()
+    # print('Relative non-zero data points in test data: \n', np.abs(test_data_masked[test_data_masked.nonzero()] / np.amax(test_data_masked[test_data_masked.nonzero()])).astype(float))
+    # print('Relative non-zero data points in interferometer data: \n', np.abs(f_grid[f_grid.nonzero()] / np.amax(f_grid[f_grid.nonzero()])).astype(float))
 
 if __name__ == "__main__":
     #TODO fix times of arrival
@@ -693,8 +970,11 @@ if __name__ == "__main__":
     # scale_test2()
     # discretize_test()
     # sinety_test()
+    # sinetier_test()
     # full_image_test(0)
     # image_re_test_point()
-    # image_re_test_parts()
-    full_image_test(1)
+    image_re_test_parts()
+    # image_re_test_uv()
+    # full_image_test(0)
+    # stats_test()
     pass
