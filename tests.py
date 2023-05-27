@@ -235,8 +235,7 @@ def image_re_test():
     exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     for i in range(len(test_I.baselines)):
         analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
-                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+                            int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1, False, i)
         # print(test_I.baselines[i].F / test_I.baselines[i].D)
     # print(exp /33400 * 1e-6)
     plt.vlines(-exp, -100, 10000)
@@ -247,8 +246,7 @@ def image_re_test():
 
     colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
-        samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+        samples = int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1
         ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], samples)
         analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
         delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
@@ -290,7 +288,7 @@ def stats_test():
     offset = 0e-6
     image = images.point_source(int(1e5), 0.000, offset, 1.2)
 
-    no_sims = 100
+    no_sims = 1000
     simulated = np.zeros((no_sims, 4), dtype=np.complex_)
     masked = np.zeros((no_sims, 4), dtype=np.complex_)
 
@@ -316,10 +314,10 @@ def stats_test():
         if sim % 10 == 0:
             print(f'Done with sim {sim}')
 
-    print(f'Average amplitude of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.abs(simulated), axis=0)} +/- {np.std(np.abs(simulated), axis=0) / no_sims}')
-    print(f'Average phase of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.angle(simulated), axis=0)} +/- {np.std(np.angle(simulated), axis=0) / no_sims}')
-    print(f'Average amplitude of {no_sims} normalised nonzero points in masked plane: {np.mean(np.abs(masked), axis=0)}  +/- {np.std(np.abs(masked), axis=0) / no_sims}')
-    print(f'Average phase of {no_sims} normalised nonzero points in masked plane: {np.mean(np.angle(masked), axis=0)}  +/- {np.std(np.angle(masked), axis=0) / no_sims}')
+    print(f'Average amplitude of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.abs(simulated), axis=0)} +/- {np.std(np.abs(simulated), axis=0) / np.sqrt(no_sims)}')
+    print(f'Average phase of {no_sims} normalised nonzero points in interferometer plane: {np.mean(np.angle(simulated), axis=0)} +/- {np.std(np.angle(simulated), axis=0) / np.sqrt(no_sims)}')
+    print(f'Average amplitude of {no_sims} normalised nonzero points in masked plane: {np.mean(np.abs(masked), axis=0)}  +/- {np.std(np.abs(masked), axis=0) / np.sqrt(no_sims)}')
+    print(f'Average phase of {no_sims} normalised nonzero points in masked plane: {np.mean(np.angle(masked), axis=0)}  +/- {np.std(np.angle(masked), axis=0) / np.sqrt(no_sims)}')
     
 def image_re_test_uv():
     # m = 10
@@ -339,7 +337,7 @@ def image_re_test_uv():
     # test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 1024)
+    test_data = process.interferometer_data(test_I, image, 10, 100000)
     print('Processing this image took ', time.time() - start, ' seconds')
 
     colourlist = ['b', 'orange', 'g', 'r']
@@ -351,8 +349,7 @@ def image_re_test_uv():
         #                     np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
         print(int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1)
         analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
-                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+                            int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1, False, i)
         plt.vlines(exp, -100, 10000, color=colourlist[i])
         plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
         plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
@@ -366,8 +363,7 @@ def image_re_test_uv():
     # plt.show()
 
     for i in range(len(test_I.baselines)):
-        samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+        samples = int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1
         binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
         centres = edges[:-1] + (edges[1:] - edges[:-1])/2
         print(centres)
@@ -464,20 +460,15 @@ def image_re_test_parts():
     test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 512)
+    test_data = process.interferometer_data(test_I, image, 10, 100000)
     print('Processing this image took ', time.time() - start, ' seconds')
-
-    # plt.plot(test_data.test_data)
-    # plt.show()
-    plt.subplot
 
     colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
         exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
         delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-        analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
-                            int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+        analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+                            int(np.ceil(test_I.baselines[i].W / test_I.res_pos)), False, i)
         plt.vlines(exp, -100, 10000, color=colourlist[i])
         plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
         plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
@@ -491,8 +482,7 @@ def image_re_test_parts():
     # plt.show()
 
     for i in range(len(test_I.baselines)):
-        samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-                            np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+        samples = int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1
         binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
         centres = edges[:-1] + (edges[1:] - edges[:-1])/2
         ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
@@ -526,32 +516,30 @@ def image_re_test_parts():
 
     plt.show()
 
-    start = time.time()
-    test_data_imre = np.zeros((512, 512))
-    test_data_imre[256, 256] = 1
-    # test_data_imre[261, 261] = 1
-    # test_data_imre[12, 12] = 1
-    test_data_imre = ft.fft2(test_data_imre)
-    re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=[512,512], test_data=test_data_imre, exvfast=0)
-    print('Reconstructing this image took ', time.time() - start, ' seconds')
+    # start = time.time()
+    # test_data_imre = np.zeros((512, 512))
+    # test_data_imre[256, 256] = 1
+    # test_data_imre = ft.fft2(test_data_imre)
+    # re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, samples=[512,512], test_data=test_data_imre, exvfast=0)
+    # print('Reconstructing this image took ', time.time() - start, ' seconds')
 
-    test_image = ft.ifft2(test_data_masked)
+    # test_image = ft.ifft2(test_data_masked)
 
-    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
-    ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
-    ax1.set_title('UV-plane (amplitude)')
-    ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
-    ax2.set_title('UV-plane (phase)')
-    ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
-    ax3.set_title('Reconstructed image')
-    # ax3.plot(256, 256, 'r.')
-    ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
-    ax4.set_title('UV-plane (amplitude)')
-    ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
-    ax5.set_title('UV-plane (phase)')
-    ax6.imshow(np.abs(test_image), cmap=cm.Greens)
-    ax6.set_title('Reconstructed image')
-    plt.show()
+    # fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    # ax1.imshow(np.abs(ft.fftshift(f_grid)), cmap=cm.Reds)
+    # ax1.set_title('UV-plane (amplitude)')
+    # ax2.imshow(np.angle(ft.fftshift(f_grid)), cmap=cm.Blues)
+    # ax2.set_title('UV-plane (phase)')
+    # ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    # ax3.set_title('Reconstructed image')
+    # # ax3.plot(256, 256, 'r.')
+    # ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
+    # ax4.set_title('UV-plane (amplitude)')
+    # ax5.imshow(np.angle(ft.fftshift(test_data_masked)), cmap=cm.Greens)
+    # ax5.set_title('UV-plane (phase)')
+    # ax6.imshow(np.abs(test_image), cmap=cm.Greens)
+    # ax6.set_title('Reconstructed image')
+    # plt.show()
 
 def image_re_test_point():
     image = images.point_source(int(1e6), 0.0005, 0.000, 1.2)
@@ -820,9 +808,11 @@ def image_re_test_multiple():
 def full_image_test(test_code):
     image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
     # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
-    img_scale = .001
+    img_scale = .025
     image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
     # image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
+
+    #TODO find total FOV of instrument
 
     histedimage, _, __ = np.histogram2d(image.loc[:,0], image.loc[:,1], np.array([np.linspace(-img_scale/2, img_scale/2, pix_scale[0]), 
                                                                                   np.linspace(-img_scale/2, img_scale/2, pix_scale[1])]) * 2 * np.pi / (3600 * 360)) 
@@ -849,7 +839,7 @@ def full_image_test(test_code):
     test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 512)
+    test_data = process.interferometer_data(test_I, image, 10, 100000)
     print('Processing this image took ', time.time() - start, ' seconds')
 
     # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
@@ -899,7 +889,7 @@ def full_image_test(test_code):
     # test_data_imre[12, 12] = 1
     test_data_imre_fft = ft.fft2(test_data_imre)
     re_im, f_grid, test_data_masked = analysis.image_recon_smooth(test_data, test_I, .01 * 2 * np.pi, 
-                                                                  samples=np.array(test_data_imre.shape), test_data=test_data_imre_fft, exvfast=test_code)
+                                                                  samples=np.array(test_data_imre.shape), test_data=test_data_imre_fft)
     print('Reconstructing this image took ', time.time() - start, ' seconds')
 
     test_image = ft.ifft2(test_data_masked)
@@ -944,15 +934,15 @@ def full_image_test(test_code):
     # Look at different normalisations`
     rel_grid = test_data_masked / np.sum(test_data_masked) - f_grid / np.sum(f_grid)
 
-    ax1.imshow(np.abs(ft.fftshift(rel_grid)), cmap=cm.Reds)
-    ax1.set_title('UV-plane (amplitude difference)')
-    ax1.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
-    ax1.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
+    ax1.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Reds)
+    ax1.set_title('Recreated image')
+    # ax1.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
+    # ax1.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
 
-    ax2.imshow(np.angle(ft.fftshift(rel_grid)), cmap=cm.Greens)
-    ax2.set_title('UV-plane (phase difference)')
-    ax2.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
-    ax2.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
+    ax2.imshow(np.abs(test_image), cmap=cm.Greens)
+    ax2.set_title('theoretical image')
+    # ax2.set_xlim(shap[0] // 2 - 25, shap[0] // 2 + 25)
+    # ax2.set_ylim(shap[1] // 2 - 25, shap[1] // 2 + 25)
     # ax3.imshow(np.abs(ft.ifft2(rel_grid)))
     # ax3.set_title('Image difference')
 
@@ -973,8 +963,8 @@ if __name__ == "__main__":
     # sinetier_test()
     # full_image_test(0)
     # image_re_test_point()
-    image_re_test_parts()
+    # image_re_test_parts()
     # image_re_test_uv()
-    # full_image_test(0)
+    full_image_test(0)
     # stats_test()
     pass

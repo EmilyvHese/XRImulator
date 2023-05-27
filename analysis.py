@@ -80,7 +80,7 @@ def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)
     
     # Calculating a grid image of the fourier transformed data that can be 2d-inverse fourier transformed.
     f_grid = np.zeros(samples, dtype=np.complex_)
-    # f_coverage = np.zeros(samples)
+    f_coverage = np.zeros(samples)
     uv = np.zeros(samples, dtype=np.complex_)
 
     fft_freqs_u = ft.fftfreq(samples[0], instrument.res_pos)
@@ -107,62 +107,62 @@ def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)
 
                 # Setting up data for the fourier transform, taking only relevant photons from the current baseline
                 data_bin_i = data_bin[base_bin == i]
-                y_data, edges = np.histogram(data_bin_i, int(instrument.baselines[i].W // instrument.res_pos ) + 1)
+                y_data, edges = np.histogram(data_bin_i, int(np.ceil(instrument.baselines[i].W / instrument.res_pos)) + 1)
                 centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
                 freq_baseline = instrument.baselines[i].D / lam_bin
 
                 # Calculating u for middle of current bin by taking a projection of the current frequency
-                u = u_conv(freq_baseline * np.cos(roll + point_binsize / 2))
+                u = u_conv(freq_baseline * np.sin(roll + point_binsize / 2))
                 # Calculating v for middle of current bin by taking a projection of the current frequency
-                v = v_conv(freq_baseline * np.sin(roll + point_binsize / 2))
+                v = v_conv(freq_baseline * np.cos(roll + point_binsize / 2))
 
                 # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
                 freq = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
 
                 # Calculating magnitude of the fourier transform for the current frequency and bin
-                f_grid[u.astype(int), v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size
-                f_grid[-u.astype(int), -v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres)) / y_data.size
-                # f_coverage[[u.astype(int), -u.astype(int)], [v.astype(int), -v.astype(int)]] += 1
+                f_grid[u.astype(int), v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) 
+                f_grid[-u.astype(int), -v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres))
+                f_coverage[[u.astype(int), -u.astype(int)], [v.astype(int), -v.astype(int)]] += y_data.size
 
                 if test_data.any():
                     uv[u.astype(int), v.astype(int)] = test_data[u.astype(int), v.astype(int)]
                     uv[-u.astype(int), -v.astype(int)] = test_data[-u.astype(int), -v.astype(int)]       
 
-                if exvfast == 1:
-                    ft_x_data = ft.fftshift(ft.fftfreq(int(instrument.baselines[i].W // instrument.res_pos) + 1, instrument.res_pos))
-                    ft_y_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * f * centres)) for f in ft_x_data]) / y_data.size
-                    exact_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size, np.sum(y_data * np.exp(-2j * np.pi * -freq * centres)) / y_data.size])
-                    fft_y_data = ft.fftshift(ft.fft(y_data) / y_data.size)
+                # if exvfast == 1:
+                #     ft_x_data = ft.fftshift(ft.fftfreq(int(instrument.baselines[i].W // instrument.res_pos) + 1, instrument.res_pos))
+                #     ft_y_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * f * centres)) for f in ft_x_data]) / y_data.size
+                #     exact_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size, np.sum(y_data * np.exp(-2j * np.pi * -freq * centres)) / y_data.size])
+                #     fft_y_data = ft.fftshift(ft.fft(y_data) / y_data.size)
 
-                    fig, (ax1, ax2) = plt.subplots(2, 1)
+                #     fig, (ax1, ax2) = plt.subplots(2, 1)
 
-                    ax1.plot(ft_x_data, np.abs(ft_y_data), label='Exact')
-                    ax1.plot(ft_x_data, np.abs(fft_y_data), label='Fast')
-                    ax1.vlines([freq, -freq], np.amin(ft_y_data) - 2, np.amax(ft_y_data) + 1, color='red', label='Expected frequency')
-                    ax1.plot([freq, -freq], np.abs(exact_data), 'ro', label='Exact point')
-                    ax1.set_title('Exact vs. fast fourier transform of data')
-                    ax1.set_xlabel('Spatial frequency (m$^{-1}$)')
-                    ax1.set_ylabel('Amplitude')
-                    ax1.set_xlim(-freq * 1.2, freq * 1.2)
-                    ax1.legend()
+                #     ax1.plot(ft_x_data, np.abs(ft_y_data), label='Exact')
+                #     ax1.plot(ft_x_data, np.abs(fft_y_data), label='Fast')
+                #     ax1.vlines([freq, -freq], np.amin(ft_y_data) - 2, np.amax(ft_y_data) + 1, color='red', label='Expected frequency')
+                #     ax1.plot([freq, -freq], np.abs(exact_data), 'ro', label='Exact point')
+                #     ax1.set_title('Exact vs. fast fourier transform of data')
+                #     ax1.set_xlabel('Spatial frequency (m$^{-1}$)')
+                #     ax1.set_ylabel('Amplitude')
+                #     ax1.set_xlim(-freq * 1.2, freq * 1.2)
+                #     ax1.legend()
 
-                    ax2.plot(ft_x_data, np.angle(ft_y_data), label='Exact')
-                    ax2.plot(ft_x_data, np.angle(fft_y_data), label='Fast')
-                    ax2.vlines([freq, -freq], np.amin(np.imag(ft_y_data)) - 1, np.amax(np.imag(ft_y_data)) + 1, color='red', label='Expected frequency')
-                    ax2.plot([freq, -freq], np.angle(exact_data), 'ro', label='Exact point')
-                    ax2.set_title('Exact vs. fast fourier transform of data')
-                    ax2.set_xlabel('Spatial frequency (m$^{-1}$)')
-                    ax2.set_ylabel('Phase')
-                    ax2.set_xlim(-freq * 1.2, freq * 1.2)
-                    ax2.set_ylim(-np.pi, np.pi)
-                    ax2.legend()
+                #     ax2.plot(ft_x_data, np.angle(ft_y_data), label='Exact')
+                #     ax2.plot(ft_x_data, np.angle(fft_y_data), label='Fast')
+                #     ax2.vlines([freq, -freq], np.amin(np.imag(ft_y_data)) - 1, np.amax(np.imag(ft_y_data)) + 1, color='red', label='Expected frequency')
+                #     ax2.plot([freq, -freq], np.angle(exact_data), 'ro', label='Exact point')
+                #     ax2.set_title('Exact vs. fast fourier transform of data')
+                #     ax2.set_xlabel('Spatial frequency (m$^{-1}$)')
+                #     ax2.set_ylabel('Phase')
+                #     ax2.set_xlim(-freq * 1.2, freq * 1.2)
+                #     ax2.set_ylim(-np.pi, np.pi)
+                #     ax2.legend()
                     
-                    plt.show()
+                #     plt.show()
 
-                    exvfast = 0
+                #     exvfast = 0
 
-    # f_grid[f_coverage.nonzero()] = f_grid[f_coverage.nonzero()] / (f_coverage[f_coverage.nonzero()])
+    f_grid[f_coverage.nonzero()] /= f_coverage[f_coverage.nonzero()]
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
     return ft.ifft2(f_grid), f_grid, uv   

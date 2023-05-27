@@ -15,6 +15,7 @@ import scipy.special as sps
 import scipy.interpolate as spinter
 import matplotlib
 import matplotlib.pyplot as plt
+import time
 
 class interferometer_data():
     """ 
@@ -92,8 +93,8 @@ class interferometer_data():
             u_1 = lambda u, u_0: u + u_0/2
             u_2 = lambda u, u_0: u - u_0/2
 
-            # Times 5 to probe a large area for the later interpolation
-            u = np.linspace(-u_0, u_0, samples) * 5 
+            # Times 3 to probe a large area for the later interpolation
+            u = np.linspace(-u_0, u_0, samples) * 3
 
             S_1, C_1 = sps.fresnel(u_1(u, u_0))
             S_2, C_2 = sps.fresnel(u_2(u, u_0))
@@ -116,9 +117,7 @@ class interferometer_data():
         # Getting data from those baselines that is necessary for further calculations.
         # Must be done this way since baselines[unacc_ind].W doesn't go element-wise, and .W is not an array operation
         baseline_data = np.array([[instrument.baselines[index].W, 
-                                    instrument.baselines[index].F, 
-                                    instrument.baselines[index].theta_b,
-                                    instrument.baselines[index].D,
+                                    instrument.baselines[index].F,
                                     instrument.baselines[index].L] for index in self.baseline_indices])
 
         # Calculating the fresnell diffraction pattern for set number of fringes and samples
@@ -130,7 +129,7 @@ class interferometer_data():
         # so this does not simply move the problem.
         self.pointing = instrument.gen_pointing(np.max(image.toa))
         pos_rel = self.pointing[image.toa, :2] - image.loc
-        theta = np.cos(self.pointing[image.toa, 2] - np.arctan2(pos_rel[:, 0], (pos_rel[:, 1] + 1e-20))) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:, 1]**2)
+        theta = np.cos(self.pointing[image.toa, 2] - np.arctan2(pos_rel[:, 0], pos_rel[:, 1])) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:, 1]**2)
 
         # Doing an accept/reject method to find the precise location photons impact at.
         # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
@@ -143,19 +142,14 @@ class interferometer_data():
             photon_y = (np.random.rand(unacc_ind.size) * baseline_data[unacc_ind, 0] - baseline_data[unacc_ind, 0]/2)
 
             # Converting y positions to u positions for scaling the fresnell diffraction to            
-            photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 4]))
+            photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 2]))
             photon_fresnell = self.inter_pdf(photon_u)
-
-            # plt.plot(photon_u, photon_fresnell, '.')
-            # plt.show()
-
+            
             photon_I = np.random.rand(unacc_ind.size) * np.amax(photon_fresnell) 
 
             # Checking which photons will be accepted, and updating the accepted_array accordingly
             accepted_array[unacc_ind] = photon_I <= photon_fresnell
             self.actual_pos[unacc_ind, 1] = photon_y
-
-        # self.actual_pos[:, 1] = np.random.choice()
 
     def discretize_E(self, ins):
         """
@@ -183,7 +177,7 @@ class interferometer_data():
         
     def pixel_to_pos(self, ins):
         """ Method that turns discretized positions into the positions at the center of their respective pixels. """
-        return (self.discrete_pos + 1) * ins.res_pos + ins.pos_range[0] + ins.res_pos / 2
+        return (self.discrete_pos + .5) * ins.res_pos + ins.pos_range[0]
 
     def discretize_t(self, ins):
         """

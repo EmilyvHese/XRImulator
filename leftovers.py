@@ -345,3 +345,18 @@ def image_recon_smooth(data, instrument, point_binsize):
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data.
     return ft.ifft2(f_grid), f_grid
+
+# New and improved version using the pdf directly which should result in slightly faster results
+# Nevermind does not work faster in cases where light is coming from edges of FOV
+# u_pos = np.random.choice(u, self.size, True, I_pdf)
+# self.actual_pos[:, 1] = (u_pos / np.sqrt(2 / (lambdas * baseline_data[:, 2]))) - baseline_data[:, 1] * theta
+# i = 0
+# while self.actual_pos[abs(self.actual_pos[:, 1]) > baseline_data[:, 0]/2].any():
+#     unacc_ind = abs(self.actual_pos[:, 1]) > baseline_data[:, 0]/2
+
+#     u_pos = np.random.choice(u, self.actual_pos[unacc_ind, 1].size, True, I_pdf)
+#     self.actual_pos[unacc_ind, 1] = (u_pos / np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 2])) 
+#                                      - baseline_data[unacc_ind, 1] * theta[unacc_ind])
+    
+#     print(i, u_pos, self.actual_pos[unacc_ind, 1].size)
+#     i += 1
