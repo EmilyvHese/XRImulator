@@ -24,7 +24,7 @@ class interferometer_data():
     Does not contain manipulation methods, data inside will have to be edited via external methods.
     """
 
-    def __init__(self, instrument, image, N_f, samples):
+    def __init__(self, instrument, image, N_f, samples, noise=False):
         """ 
         This function is the main function that takes an image and converts it to instrument data as
         if the instrument had just observed the object te image is a representation of. 
@@ -32,12 +32,13 @@ class interferometer_data():
         whether they are absorbed along the way, how much noise there is, and also whether the 
         spacecraft the instrument is on wobbles, and possible correction for this.
 
-        Parameters:
+        Parameters:\n
 
         instrument (interferometer class object): Instrument object to be used to simulate observing the image.
-        image (image class object): Image object to be observed.
-        N_f (int): number of fringes we want to consistently see.
-        samples (int): number of samples to use for approximating fresnell difraction pattern.
+        image (image class object): Image object to be observed.\n
+        N_f (int): number of fringes we want to consistently see.\n
+        samples (int): number of samples to use for approximating fresnell difraction pattern.\n
+        noise (boolean) = Whether or not to include Gaussian noise, with default False for not including it.\n
         """
         # Useful shorthand
         self.size = image.size

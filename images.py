@@ -109,47 +109,35 @@ def point_source_multichromatic(size, alpha, beta, energy):
 
     return im
 
-def generate_from_image(image_path, no_photons, img_scale):
+def generate_from_image(image_path, no_photons, img_scale, energy, offset=[0,0]):
     photon_img = image(no_photons)
     # Load the image and convert it to grayscale
     img = Image.open(image_path).convert('L')
     
     # Convert the image to a numpy array
     img_array = np.array(img)
-    # img_array = np.zeros((10,10))
-    # img_array[5,5] = 1
-    # img_array[7,7] = 1
 
     pix_scale = np.array(img_array.shape)
-    # print(pix_scale)
 
-    # Generate a probability density function from the image
-    pdf = img_array / np.sum(img_array)
-
-    # histedimage, _, __ = np.histogram2d(pdf[:, 0], pdf[:, 1], pix_scale) 
-    # plt.imshow(pdf)
-    # plt.show()
+    # Generate a probability mass function from the image
+    pmf = img_array / np.sum(img_array)
     
-    # Draw N samples from the probability density function
-    photon_locations = np.random.choice(
+    # Draw N samples from the probability mass function
+    pixel_locations = np.random.choice(
         np.arange(img_array.size),
         size=no_photons,
-        p=pdf.flatten()    
+        p=pmf.flatten()    
     )
     
     # Convert the flattened indices back into (x,y) coordinates
-    photon_locations = np.column_stack(np.unravel_index(photon_locations, img_array.shape))
-    # histedimage, _, __ = np.histogram2d(photon_locations[:, 0], photon_locations[:, 1], [np.arange(pix_scale[0] + .5), np.arange(pix_scale[1] + .5)]) 
-    # plt.imshow(histedimage)
-    # plt.show()
+    pixel_locations = np.column_stack(np.unravel_index(pixel_locations, img_array.shape))
 
-    photon_locations = (photon_locations - (pix_scale/2)) * img_scale / pix_scale * 2 * np.pi / (3600 * 360)
+    # Convert the sampled pixel locations to points of origin on the sky
+    photon_img.loc = ((pixel_locations - (pix_scale/2)) * img_scale / pix_scale + np.array(offset)) * 2 * np.pi / (3600 * 360)
 
-    # print(photon_locations, 0.0005 * 2 * np.pi / (3600 * 360))
-    photon_img.loc = photon_locations
-
+    # Generating photon energies and times of arrival
     for i in range(no_photons):
-        photon_img.energies[i] = 1.2 * 1.602177733e-16
+        photon_img.energies[i] = energy * 1.602177733e-16
         photon_img.toa[i] = i 
 
     return photon_img, pix_scale

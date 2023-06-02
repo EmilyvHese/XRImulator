@@ -469,8 +469,8 @@ def image_re_test_parts():
         delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
         analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
                             int(np.ceil(test_I.baselines[i].W / test_I.res_pos)), False, i)
-        plt.vlines(exp, -100, 10000, color=colourlist[i])
-        plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
+        # plt.vlines(exp, -100, 10000, color=colourlist[i])
+        # plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
         plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
         plt.ylim(0, 8000)
         plt.xlim(-200, 200)
@@ -806,10 +806,11 @@ def image_re_test_multiple():
     plt.show()
 
 def full_image_test(test_code):
-    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
+    # image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
+    image_path = r"C:\Users\nielz\Pictures\Funky  mode.png"
     # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
-    img_scale = .025
-    image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
+    img_scale = .00015
+    image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale, 1.2)
     # image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale)
 
     #TODO find total FOV of instrument
@@ -903,7 +904,7 @@ def full_image_test(test_code):
     ax2.set_title('UV-plane (phase)')
     # ax2.set_xlim(shap[0] // 2 - 100, shap[0] // 2 + 100)
     # ax2.set_ylim(shap[1] // 2 - 100, shap[1] // 2 + 100)
-    ax3.imshow(np.abs(ft.fftshift(re_im)), cmap=cm.Greens)
+    ax3.imshow(np.abs(ft.ifftshift(re_im)), cmap=cm.Greens)
     ax3.set_title('Reconstructed image')
 
     ax4.imshow(np.abs(ft.fftshift(test_data_masked)), cmap=cm.Blues)
@@ -947,8 +948,53 @@ def full_image_test(test_code):
     # ax3.set_title('Image difference')
 
     plt.show()
+
+    f_grid[f_grid.nonzero()] = 1
+
+    plt.imshow(np.abs(ft.ifftshift(f_grid)), cmap=cm.Greens)
+    plt.show()
+
+    plt.imshow(np.abs(ft.ifftshift(re_im)), cmap=cm.Greens)
+    plt.show()
     # print('Relative non-zero data points in test data: \n', np.abs(test_data_masked[test_data_masked.nonzero()] / np.amax(test_data_masked[test_data_masked.nonzero()])).astype(float))
     # print('Relative non-zero data points in interferometer data: \n', np.abs(f_grid[f_grid.nonzero()] / np.amax(f_grid[f_grid.nonzero()])).astype(float))
+
+def image_re_test_exact():
+    offset = 0e-6
+    # image = images.point_source(int(1e5), 0.000, offset, 1.2)
+    # image = images.m_point_sources(int(1e6), 4, [0.000, -0.000, -.0004, .00085], [0.000236, -0.00065, 0., 0.], [1.2, 1.2, 1.2, 1.2])
+
+    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
+    # image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\hmxb.jpg"
+    # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
+    img_scale = .0015
+    image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale, 1.2)
+
+    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00003 * 2 * np.pi, roll_init=0/4 * np.pi)
+    for D in np.linspace(.05, 1, 30):
+        test_I.add_willingale_baseline(D)
+
+    start = time.time()
+    test_data = process.interferometer_data(test_I, image, 10, 100000)
+    print('Processing this image took ', time.time() - start, ' seconds')
+
+    start = time.time()
+    re_im, f_values, uv = analysis.image_recon_smooth2(test_data, test_I, .02 * 2 * np.pi, .0025, samples=[512,512])
+    print('Reconstructing this image took ', time.time() - start, ' seconds')
+
+    fig = plt.figure(figsize=(6,6))
+    plt.imshow(re_im, cmap=cm.Greens)
+    plt.show()
+
+    fig = plt.figure(figsize=(6,6))
+    plt.plot(uv[:, 0], uv[:, 1], 'g.')
+    plt.xlim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
+    plt.ylim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
+    plt.show()
+
+
 
 if __name__ == "__main__":
     #TODO fix times of arrival
@@ -964,7 +1010,8 @@ if __name__ == "__main__":
     # full_image_test(0)
     # image_re_test_point()
     # image_re_test_parts()
+    image_re_test_exact()
     # image_re_test_uv()
-    full_image_test(0)
+    # full_image_test(0)
     # stats_test()
     pass

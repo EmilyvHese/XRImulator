@@ -10,7 +10,7 @@ class baseline():
     This class defines a single baseline in an interferometer object, and is used as a helper for the interferometer class objects as a result.
     """
 
-    def __init__(self, D, L, W, F, theta_g, length):
+    def __init__(self, D, L, W, F):
         """ 
         Function that generates a single x-ray interferometer baseline according to given specifications.
         
@@ -20,22 +20,14 @@ class baseline():
         L (float) = Length from last mirror to CCD surface (in meters)\n
         W (float) = incident photon beam width (in micrometers)\n
     	F (float) = effective focal length of interferometer (in meters)\n
-        theta_g (float) = grazing incidence angle of mirrors (in degrees)\n
         length (float) = length of mirrors, needed to define collecting area (in meters)\n
         #TODO add more relevant parameters
         """
-        #TODO look into using a dict here to make array operations possible
         # Converting all input parameters into self.parameters in SI units.
         self.D = D
+        self.L = L
         self.W = W * 1e-6
         self.F = F
-        self.theta_g = theta_g * 2 * np.pi / 360
-        self.length = length
-
-        # Calculating some more relevant parameters for ease of access.
-        self.theta_b = D / F
-        self.colarea = W * length * 2
-        self.L = L
         
 class interferometer():
     """ 
@@ -55,11 +47,11 @@ class interferometer():
         res_E (float) = Energy resolution of CCD's in instrument (in KeV)\n
         res_t (float) = Time resolution of CCD's in instrument (seconds)\n
         res_pos (float) = Length from last mirror to CCD surface (in meters)\n
-        E_range (array-like of floats) = incident photon beam width (in micrometers)\n
-    	pos_range (array-like of floats) = effective focal length of interferometer (in meters)\n
-        wobble_I (float) = Intensity of wobble effect, used as sigma in for normally distributed random walk steps. Default is 0, which means no wobble. (in arcsec)\n
-        wobble_c (function) = function to use to correct for spacecraft wobble in observation (possibly not relevant here)\n
-        roller (function) = function to use to simulate the spacecraft rolling. Options are 'smooth_roll' and 'discrete_roll'.\n
+        E_range (array-like of floats) = Incident photon beam width (in micrometers)\n
+    	pos_range (array-like of floats) = Effective focal length of interferometer (in meters)\n
+        wobble_I (float) = Intensity of wobble effect, used as sigma in normally distributed random walk steps. Default is 0, which means no wobble. (in arcsec)\n
+        wobble_c (function) = Function to use to correct for spacecraft wobble in observation (possibly not relevant here)\n
+        roller (function) = Function to use to simulate the spacecraft rolling. Options are 'smooth_roll' and 'discrete_roll'.\n
         roll_speed (float) = Indicator for how quickly spacecraft rolls around. Default is 0, meaning no roll. (in rad/sec)\n
         roll_stop_t (float) = Indicator for how long spacecraft rests at specific roll if using 'discrete_roll'. Default is 0, meaning it doesn't stop. (in seconds)\n
         roll_stop_a (float) = Indicator for at what angle increments spacecraft rests at if using 'discrete_roll'. Default is 0, meaning it doesn't stop. (in rads)\n
@@ -188,19 +180,18 @@ class interferometer():
 
         return pointing
 
-    def add_baseline(self, D, L, W, F, theta_g, length):
+    def add_baseline(self, D, L, W, F):
         """
         Function that adds a baseline of given parameters to the interferometer object. Call this function multiple times to
         construct a full interferometer capable of actually observing images. Without these, no photons can be measured.
         
         Parameters:
         D (float) = Baseline of the interferometer (in meters)\n
-        D_varspeed (float) = Speed at which the baseline can be varied in the interferomter (meters per time step)\n
         L (float) = Length from last mirror to CCD surface (in meters)\n
         W (float) = incident photon beam width (in micrometers)\n
     	F (float) = effective focal length of interferometer (in meters)\n
-        theta_g (float) = grazing incidence angle of mirrors (in degrees)\n
-        length (float) = length of mirrors, needed to define collecting area (in meters)\n
-        #TODO add more relevant parameters
         """
-        self.baselines.append(baseline(D, L, W, F, theta_g, length))
+        self.baselines.append(baseline(D, L, W, F))
+
+    def add_willingale_baseline(self, D):
+        self.baselines.append(baseline(D, 10, 300, D/(2*np.tan(6 * np.pi / (3600 * 360)))))
