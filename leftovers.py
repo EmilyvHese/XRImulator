@@ -360,3 +360,191 @@ def image_recon_smooth(data, instrument, point_binsize):
     
 #     print(i, u_pos, self.actual_pos[unacc_ind, 1].size)
 #     i += 1
+
+
+def image_recon_smooth(data, instrument, point_binsize, test_data=np.zeros((1,1)), samples = 512, exvfast = 0):
+    """
+    This function is to be used to reconstruct images from interferometer data.
+    Bins input data based on roll angle, which is important to fill out the uv-plane that will be fed into 
+    the 2d inverse fourier transform.
+
+    Args:
+        data (interferometer_data class object): The interferometer data to recover an image from.
+        instrument (interferometer class object): The interferometer used to record the aforementioned data.
+        point_binsize (float): Size of roll angle bins.
+        samples (int): N for the NxN matrix that is the uv-plane used for the 2d inverse fourier transform.
+        
+    Returns:
+        array, array: Two arrays, first of which is the recovered image, second of which is the array used in the ifft.
+    """    
+    # Setting up some necessary parameters
+    pos_data = data.pixel_to_pos(instrument)[:, 1]
+    time_data = data.discrete_t
+    base_ind = data.baseline_indices
+    pointing = data.pointing
+    
+    # Calculating a grid image of the fourier transformed data that can be 2d-inverse fourier transformed.
+    f_grid = np.zeros(samples, dtype=np.complex_)
+    f_coverage = np.zeros(samples)
+    uv = np.zeros(samples, dtype=np.complex_)
+
+    # fft_freqs_u = ft.fftfreq(int((instrument.pos_range[1] - instrument.pos_range[0]) /  instrument.res_pos), instrument.res_pos)
+    fft_freqs_u = ft.fftfreq(samples[0], instrument.res_pos)
+    fft_freq_ind_u = np.arange(0, fft_freqs_u.size, 1, dtype=np.int_)
+    u_conv = spinter.interp1d(fft_freqs_u, fft_freq_ind_u, kind='nearest')
+
+    # fft_freqs_v = ft.fftfreq(int((instrument.pos_range[1] - instrument.pos_range[0]) /  instrument.res_pos), instrument.res_pos)
+    fft_freqs_v = ft.fftfreq(samples[1], instrument.res_pos)
+    fft_freq_ind_v = np.arange(0, fft_freqs_v.size, 1, dtype=np.int_)
+    v_conv = spinter.interp1d(fft_freqs_v, fft_freq_ind_v, kind='nearest')
+
+    for roll in np.arange(0, 2 * np.pi, point_binsize):
+        # Binning data based on roll angle.
+        ind_in_range = (((pointing[time_data, 2] % (2 * np.pi)) >= roll) * 
+                            ((pointing[time_data, 2] % (2 * np.pi)) < roll + point_binsize))
+
+        if ind_in_range.any():
+            data_bin = pos_data[ind_in_range]
+            base_bin = base_ind[ind_in_range]
+
+            for i in range(len(instrument.baselines)):
+                lam_bin = (spc.h * spc.c / (1.2 * spc.eV))
+
+                # Setting up data for the fourier transform, taking only relevant photons from the current baseline
+                data_bin_i = data_bin[base_bin == i]
+                y_data, edges = np.histogram(data_bin_i, int(np.ceil(instrument.baselines[i].W / instrument.res_pos)) + 1)
+                centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+                freq_baseline = instrument.baselines[i].D / lam_bin
+
+                # Calculating u for middle of current bin by taking a projection of the current frequency
+                u = u_conv(freq_baseline * np.sin(roll + point_binsize / 2))
+                # Calculating v for middle of current bin by taking a projection of the current frequency
+                v = v_conv(freq_baseline * np.cos(roll + point_binsize / 2))
+
+                # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
+                freq = 1 / np.sqrt(instrument.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+
+                # Calculating magnitude of the fourier transform for the current frequency and bin
+                f_grid[u.astype(int), v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) 
+                f_grid[-u.astype(int), -v.astype(int)] += np.sum(y_data * np.exp(-2j * np.pi * -freq * centres))
+                f_coverage[[u.astype(int), -u.astype(int)], [v.astype(int), -v.astype(int)]] += y_data.size
+
+                if test_data.any():
+                    uv[u.astype(int), v.astype(int)] = test_data[u.astype(int), v.astype(int)]
+                    uv[-u.astype(int), -v.astype(int)] = test_data[-u.astype(int), -v.astype(int)]       
+
+                # if exvfast == 1:
+                #     ft_x_data = ft.fftshift(ft.fftfreq(int(instrument.baselines[i].W // instrument.res_pos) + 1, instrument.res_pos))
+                #     ft_y_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * f * centres)) for f in ft_x_data]) / y_data.size
+                #     exact_data = np.array([np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size, np.sum(y_data * np.exp(-2j * np.pi * -freq * centres)) / y_data.size])
+                #     fft_y_data = ft.fftshift(ft.fft(y_data) / y_data.size)
+
+                #     fig, (ax1, ax2) = plt.subplots(2, 1)
+
+                #     ax1.plot(ft_x_data, np.abs(ft_y_data), label='Exact')
+                #     ax1.plot(ft_x_data, np.abs(fft_y_data), label='Fast')
+                #     ax1.vlines([freq, -freq], np.amin(ft_y_data) - 2, np.amax(ft_y_data) + 1, color='red', label='Expected frequency')
+                #     ax1.plot([freq, -freq], np.abs(exact_data), 'ro', label='Exact point')
+                #     ax1.set_title('Exact vs. fast fourier transform of data')
+                #     ax1.set_xlabel('Spatial frequency (m$^{-1}$)')
+                #     ax1.set_ylabel('Amplitude')
+                #     ax1.set_xlim(-freq * 1.2, freq * 1.2)
+                #     ax1.legend()
+
+                #     ax2.plot(ft_x_data, np.angle(ft_y_data), label='Exact')
+                #     ax2.plot(ft_x_data, np.angle(fft_y_data), label='Fast')
+                #     ax2.vlines([freq, -freq], np.amin(np.imag(ft_y_data)) - 1, np.amax(np.imag(ft_y_data)) + 1, color='red', label='Expected frequency')
+                #     ax2.plot([freq, -freq], np.angle(exact_data), 'ro', label='Exact point')
+                #     ax2.set_title('Exact vs. fast fourier transform of data')
+                #     ax2.set_xlabel('Spatial frequency (m$^{-1}$)')
+                #     ax2.set_ylabel('Phase')
+                #     ax2.set_xlim(-freq * 1.2, freq * 1.2)
+                #     ax2.set_ylim(-np.pi, np.pi)
+                #     ax2.legend()
+                    
+                #     plt.show()
+
+                #     exvfast = 0
+
+    f_grid[f_coverage.nonzero()] /= f_coverage[f_coverage.nonzero()]
+
+    # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
+    return ft.ifft2(f_grid), f_grid, uv 
+
+#Old processing
+def process_photon_dpos(self, instrument, image, N_f, samples):
+        """
+        This function is a helper function for process_image that specifically processes the locations where photons impact
+        on the detector (hence the d(etector)pos(ition) name). Not to be used outside the process_image context.
+
+        Paramater definitions can be found in process_image.
+        """
+
+        def fre_dif(wavelength, baseline):
+            """
+            Helper function that calculates the fresnell difraction pattern for two overlapping
+            beams such as is the case in the interferometer. Does so according to a specified number
+            of fringes to model out to, and a number of samples to use to interpolate between.
+            """
+            u_0 = baseline.W * np.sqrt(2 / (wavelength * baseline.L))
+            u_1 = lambda u, u_0: u + u_0/2
+            u_2 = lambda u, u_0: u - u_0/2
+
+            # Times 3 to probe a large area for the later interpolation
+            u = np.linspace(-u_0, u_0, samples)
+
+            S_1, C_1 = sps.fresnel(u_1(u, u_0))
+            S_2, C_2 = sps.fresnel(u_2(u, u_0))
+
+            A = (C_2 - C_1 + 1j*(S_2 - S_1)) * (1 + np.exp(np.pi * 1j * u_0 * u))
+            A_star = np.conjugate(A)
+
+            I = np.abs(A * A_star)
+            I_pdf = I / sum(I)
+
+            return I_pdf, u
+
+        self.actual_pos = np.zeros((self.size, 2))
+        # Calculating photon wavelengths and phases from their energies
+        # wavelengths = spc.h * spc.c / image.energies
+
+        # Randomly selecting a baseline for the photon to go in. 
+        self.baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
+
+        # Getting data from those baselines that is necessary for further calculations.
+        # Must be done this way since baselines[unacc_ind].W doesn't go element-wise, and .W is not an array operation
+        # baseline_data = np.array([[instrument.baselines[index].W, 
+        #                             instrument.baselines[index].F,
+        #                             instrument.baselines[index].L] for index in self.baseline_indices])
+
+        # Calculating the fresnell diffraction pattern for set number of fringes and samples
+        # self.inter_pdf = fre_dif(N_f, samples)
+
+        # Defining the pointing, relative position and off-axis angle for each photon over time.
+        # Relative position is useful for the calculation of theta, since the off-axis angle is very dependent on where the axis is.
+        # There is a 1e-20 factor in a denominator, to prevent divide by zero errors. Typical values for pos_rel are all much larger, 
+        # so this does not simply move the problem.
+        self.pointing = instrument.gen_pointing(np.max(image.toa))
+        pos_rel = self.pointing[image.toa, :2] - image.loc
+        theta = np.cos(self.pointing[image.toa, 2] - np.arctan2(pos_rel[:, 0], pos_rel[:, 1])) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:, 1]**2)
+
+        # Doing an accept/reject method to find the precise location photons impact at.
+        # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
+        # accepted_array = np.full(image.size, False, bool)
+        # while np.any(accepted_array == False):
+        #     # Indices of all unaccepted photons, which are the only ones that need to be generated again each loop.
+        #     unacc_ind = np.nonzero(accepted_array == False)[0]
+
+        #     # Generating new photons for all the unaccepted indices with accurate y-locations and random intensities.
+        #     photon_y = (np.random.rand(unacc_ind.size) * baseline_data[unacc_ind, 0] - baseline_data[unacc_ind, 0]/2)
+
+        #     # Converting y positions to u positions for scaling the fresnell diffraction to            
+        #     photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (wavelengths[unacc_ind] * baseline_data[unacc_ind, 2]))
+        #     photon_fresnell = self.inter_pdf(photon_u)
+            
+        #     photon_I = np.random.rand(unacc_ind.size) * np.amax(photon_fresnell) 
+
+        #     # Checking which photons will be accepted, and updating the accepted_array accordingly
+        #     accepted_array[unacc_ind] = photon_I <= photon_fresnell
+        #     self.actual_pos[unacc_ind, 1] = photon_y 

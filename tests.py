@@ -2,6 +2,7 @@ import numpy as np
 import scipy.special as sps
 import scipy.constants as spc
 import scipy.interpolate as spinter
+import scipy.optimize as spopt
 import scipy.stats as spst
 import scipy.fft as ft
 import matplotlib.pyplot as plt
@@ -148,8 +149,8 @@ def w_ps_test():
     test_data = process.interferometer_data(test_I, image, 10, int(1e4))
     print('Processing this image took ', time.time() - start, ' seconds')
 
-    analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1], int(np.amax(test_data.discrete_pos[:, 1]) - np.amin(test_data.discrete_pos[:, 1])) + 1, False)
-    ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1])
+    analysis.hist_data(test_data.pixel_to_pos(test_I), int(np.amax(test_data.discrete_pos) - np.amin(test_data.discrete_pos)) + 1, False)
+    ft_x_data, ft_y_data = analysis.ft_data(test_data.pixel_to_pos(test_I))
     analysis.plot_ft(ft_x_data, ft_y_data, 2)
 
 def willingale_test():
@@ -168,14 +169,14 @@ def willingale_test():
     print('Processing this image took ', time.time() - start, ' seconds')
 
     # for i in range(4):
-    #     analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], 
-    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     analysis.hist_data(test_data.pixel_to_pos(test_I)[test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1, False, i)
     # plt.legend()
     # plt.show()
 
     # for i in range(4):
-    #     ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i])
+    #     ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[test_data.baseline_indices == i])
     #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
     # delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (np.array([1.2, 1.6]) * 1.602177733e-16 * 10))
     # plt.axvline(delta_u[0], 1e-5, 1e4)
@@ -234,7 +235,7 @@ def image_re_test():
 
     exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     for i in range(len(test_I.baselines)):
-        analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
+        analysis.hist_data(test_data.actual_pos[test_data.baseline_indices == i], 
                             int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1, False, i)
         # print(test_I.baselines[i].F / test_I.baselines[i].D)
     # print(exp /33400 * 1e-6)
@@ -247,7 +248,7 @@ def image_re_test():
     colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
         samples = int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1
-        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[:, 1][test_data.baseline_indices == i], samples)
+        ft_x_data, ft_y_data, edges = analysis.ft_data(test_data.pixel_to_pos(test_I)[test_data.baseline_indices == i], samples)
         analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
         delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * 1.602177733e-16 * 10))
         plt.axvline(delta_u, 1e-5, 1e4, color = colourlist[i])
@@ -344,11 +345,11 @@ def image_re_test_uv():
     for i in range(len(test_I.baselines)):
         exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
         delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-        # analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
-        #                     int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-        #                     np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
-        print(int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1)
-        analysis.hist_data(test_data.pixel_to_pos(test_I)[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+        # analysis.hist_data(test_data.actual_pos[(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
+        #                     int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+        #                     np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1, False, i)
+        print(int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1)
+        analysis.hist_data(test_data.pixel_to_pos(test_I)[(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
                             int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1, False, i)
         plt.vlines(exp, -100, 10000, color=colourlist[i])
         plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
@@ -448,51 +449,55 @@ def image_re_test_parts():
     #TODO look at testing with sinusoid instead of point source
 
     offset = 0e-6
-    image = images.point_source(int(1e6), 0.000, offset, 1.2)
+    energy = 1.2
+    image = images.point_source(int(1e5), 0.000, offset, energy)
     # image = images.double_point_source(int(1e6), [0.000, 0.000], [0.0005, -0.0005], [1.2, 1.2])
 
-    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-1000, 1000]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
                                         .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
-    # test_I.add_baseline(.035, 10, 300, 1200, 2, 1)
-    # test_I.add_baseline(.105, 10, 300, 3700, 2, 1)
-    # test_I.add_baseline(.315, 10, 300, 11100, 2, 1)
-    test_I.add_baseline(.945, 10, 300, 33400, 2, 1)
+    # test_I.add_baseline(.035, 10, 300, 1200)
+    # test_I.add_baseline(.105, 10, 300, 3700)
+    # test_I.add_baseline(.315, 10, 300, 11100)
+    test_I.add_baseline(.945, 10, 300, 33400)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 100000)
+    test_data = process.interferometer_data(test_I, image, 100000)
     print('Processing this image took ', time.time() - start, ' seconds')
 
     colourlist = ['b', 'orange', 'g', 'r']
     for i in range(len(test_I.baselines)):
-        exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
-        delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-        analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] >= test_I.roll_init - .01 * np.pi) * (test_data.pointing[test_data.discrete_t, 2] < test_I.roll_init + .01 * np.pi) * (test_data.baseline_indices == i)], 
-                            int(np.ceil(test_I.baselines[i].W / test_I.res_pos)), False, i)
+        # exp = test_I.baselines[i].F * np.cos(test_data.pointing[0, 2] - np.arctan2(image.loc[0, 0], (image.loc[0, 1]))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
+        # delta_y = test_I.baselines[i].L * spc.h * spc.c / (energy * spc.eV * 1e3 * test_I.baselines[i].W) * 1e6
+        plt.hist(test_data.actual_pos, 
+                            int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / (test_I.res_pos))), label='No noise')
+        plt.hist(test_data.noisy_pos, 
+                            int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / (test_I.res_pos))), label='Noisy (2 $\mu$as Gauss)')
         # plt.vlines(exp, -100, 10000, color=colourlist[i])
-        # plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
+        # plt.vlines(exp + (delta_y * np.arange(-5, 5, 1)), -100, 10000, color=colourlist[i])
         plt.title(f'Photon impact positions on detector at roll of {test_I.roll_init / np.pi} pi rad')
-        plt.ylim(0, 8000)
-        plt.xlim(-200, 200)
+        # plt.ylim(0, 8000)
+        # plt.xlim(-400, 400)
         plt.legend()
-        plt.show()
+    plt.show()
 
     # test_freq = np.fft.fftfreq(test_data.size)
     # plt.plot(test_freq, np.fft.fftshift(np.fft.fft(test_data.test_data)))
     # plt.show()
 
     for i in range(len(test_I.baselines)):
-        samples = int(np.ceil(test_I.baselines[i].W / test_I.res_pos)) + 1
-        binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
+        samples = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos)) + 1
+        binned_data, edges = np.histogram(test_data.actual_pos[test_data.baseline_indices == i], samples)
         centres = edges[:-1] + (edges[1:] - edges[:-1])/2
         ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
 
         fig, (ax1, ax2) = plt.subplots(2,1)
-        delta_u = 1 / np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
+        delta_u = 1 / (test_I.baselines[i].L * spc.h * spc.c / (energy * spc.eV * 1e3 * test_I.baselines[i].W))
         exact = (np.sum(binned_data * np.exp(-2j * np.pi * -delta_u * centres)) / binned_data.size, np.sum(binned_data * np.exp(-2j * np.pi * delta_u * centres)) / binned_data.size)
+        zero = (np.sum(binned_data) / binned_data.size)
         fig.suptitle(f'Exact values for amplitude: {np.round(np.abs(exact), 5)}, for phase: {np.round(np.angle(exact), 5)} at offset {np.round(offset, 6)} \"')
 
-        print(exact, np.abs(exact), np.angle(exact))
+        print(np.abs(exact), np.abs(zero), np.abs(exact) / np.abs(zero))
 
         analysis.plot_ft(ft_x_data, np.abs(ft_y_data), ax1, 0, i)
         ax1.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
@@ -508,6 +513,7 @@ def image_re_test_parts():
         ax2.axvline(delta_u, 1e-5, 1e4, color = 'k', label='Expected frequency')
         ax2.axvline(-delta_u, 1e-5, 1e4, color = 'k')
         ax2.plot([-delta_u, delta_u], np.angle(exact), 'ro', label='Exact value')
+        # ax2.plot([-delta_u * 2, delta_u * 2], [2 * np.pi * exp/delta_y, 2 * np.pi * exp/delta_y], 'g-', label='Expectation phase')
         ax2.set_xlim(-4 * delta_u, 4 * delta_u)
         ax2.set_title(f'Fourier transform of photon positions at roll of {test_I.roll_init / (np.pi)} pi rad')
         ax2.set_xlabel('Spatial frequency ($m^{-1}$)')
@@ -563,9 +569,9 @@ def image_re_test_point():
     # for i in range(len(test_I.baselines)):
     #     exp = test_I.baselines[i].F * np.cos(-np.arctan2(image.loc[0, 0], (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     #     delta_y = np.sqrt(test_I.baselines[i].L * spc.h * spc.c / (1.2 * spc.eV * 1e3 * 10))
-    #     analysis.hist_data(test_data.actual_pos[:, 1][(test_data.pointing[test_data.discrete_t, 2] > 0) * (test_data.pointing[test_data.discrete_t, 2] < .1 * np.pi) * (test_data.baseline_indices == i)], 
-    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     analysis.hist_data(test_data.actual_pos[(test_data.pointing[test_data.discrete_t, 2] > 0) * (test_data.pointing[test_data.discrete_t, 2] < .1 * np.pi) * (test_data.baseline_indices == i)], 
+    #                         int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1, False, i)
     #     plt.vlines(exp, -100, 10000, color=colourlist[i])
     #     plt.vlines(exp + (delta_y * np.arange(-5, 5, 1))*1e6, -100, 10000, color=colourlist[i])
     #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
@@ -581,8 +587,8 @@ def image_re_test_point():
     # plt.show()
 
     # for i in range(len(test_I.baselines)):
-    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     samples = int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1
     #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
     #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
     #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
@@ -748,9 +754,9 @@ def image_re_test_multiple():
 
     # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     # for i in range(len(test_I.baselines)):
-    #     analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
-    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     analysis.hist_data(test_data.actual_pos[test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1, False, i)
     #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
     # # print(exp /33400 * 1e-6)
     # # plt.vlines(-exp, -100, 10000)
@@ -765,8 +771,8 @@ def image_re_test_multiple():
 
     # colourlist = ['b', 'orange', 'g', 'r']
     # for i in range(len(test_I.baselines)):
-    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     samples = int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1
     #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
     #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
     #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
@@ -845,9 +851,9 @@ def full_image_test(test_code):
 
     # exp = test_I.baselines[0].F * np.cos(-np.arctan(image.loc[0, 0] / (image.loc[0, 1] + 1e-20))) * np.sqrt(image.loc[0, 0]**2 + image.loc[0, 1]**2) * 1e6
     # for i in range(len(test_I.baselines)):
-    #     analysis.hist_data(test_data.actual_pos[:, 1][test_data.baseline_indices == i], 
-    #                         int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1, False, i)
+    #     analysis.hist_data(test_data.actual_pos[test_data.baseline_indices == i], 
+    #                         int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1, False, i)
     #     # print(test_I.baselines[i].F / test_I.baselines[i].D)
     # # print(exp /33400 * 1e-6)
     # # plt.vlines(-exp, -100, 10000)
@@ -862,8 +868,8 @@ def full_image_test(test_code):
 
     # colourlist = ['b', 'orange', 'g', 'r']
     # for i in range(len(test_I.baselines)):
-    #     samples = int(np.amax(test_data.discrete_pos[:, 1][test_data.baseline_indices == i]) - 
-    #                         np.amin(test_data.discrete_pos[:, 1][test_data.baseline_indices == i])) + 1
+    #     samples = int(np.amax(test_data.discrete_pos[test_data.baseline_indices == i]) - 
+    #                         np.amin(test_data.discrete_pos[test_data.baseline_indices == i])) + 1
     #     binned_data, edges = np.histogram(test_data.actual_pos[:,1][test_data.baseline_indices == i], samples)
     #     ft_x_data, ft_y_data = analysis.ft_data(binned_data, samples, edges[1] - edges[0])
     #     analysis.plot_ft(ft_x_data, ft_y_data, 0, i)
@@ -964,37 +970,370 @@ def image_re_test_exact():
     # image = images.point_source(int(1e5), 0.000, offset, 1.2)
     # image = images.m_point_sources(int(1e6), 4, [0.000, -0.000, -.0004, .00085], [0.000236, -0.00065, 0., 0.], [1.2, 1.2, 1.2, 1.2])
 
-    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\galaxy_lobes.png"
-    # image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\hmxb.jpg"
+    # image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\disc.png"
+    image_path = r"C:\Users\nielz\Documents\Uni\Master\Thesis\Simulator\vri\models\hmxb.jpg"
     # img_scale = 2.2 * .75 * 6.957 * 1e8 / (9.714 * spc.parsec)
-    img_scale = .0015
-    image, pix_scale = images.generate_from_image(image_path, int(1e6), img_scale, 1.2)
+    # img_scale = (.2 * spc.au / (2.25 * spc.parsec * 1e3)) * 3600 * 360 / (2 * np.pi) 
+    img_scale = .00055
+    print(img_scale)
+    image, pix_scale = images.generate_from_image(image_path, int(1e5), img_scale, 6.4)
 
-    test_I = instrument.interferometer(.1, 1, .5, np.array([1.2, 6]), np.array([-400, 400]), 
+    # fig = plt.figure(figsize=(5,5))
+    # plt.plot(image.loc[:,1] * (3600*360 / (2 * np.pi)), image.loc[:,0] * (3600*360 / (2 * np.pi)), '.', alpha=.2)
+    # plt.show()
+
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
-                                        .00003 * 2 * np.pi, roll_init=0/4 * np.pi)
+                                        .00001 * 2 * np.pi, roll_init=0/4 * np.pi)
     for D in np.linspace(.05, 1, 30):
         test_I.add_willingale_baseline(D)
 
     start = time.time()
-    test_data = process.interferometer_data(test_I, image, 10, 100000)
+    test_data = process.interferometer_data(test_I, image, 100000)
     print('Processing this image took ', time.time() - start, ' seconds')
 
     start = time.time()
-    re_im, f_values, uv = analysis.image_recon_smooth2(test_data, test_I, .02 * 2 * np.pi, .0025, samples=[512,512])
+    re_im, f_values, uv = analysis.image_recon_smooth(test_data, test_I, .02 * 2 * np.pi, img_scale, samples=pix_scale)
     print('Reconstructing this image took ', time.time() - start, ' seconds')
 
     fig = plt.figure(figsize=(6,6))
-    plt.imshow(re_im, cmap=cm.Greens)
+    plt.imshow(re_im, cmap=cm.cubehelix)
     plt.show()
 
-    fig = plt.figure(figsize=(6,6))
-    plt.plot(uv[:, 0], uv[:, 1], 'g.')
-    plt.xlim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
-    plt.ylim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
+    # fig = plt.figure(figsize=(6,6))
+    # plt.plot(uv[:, 0], uv[:, 1], 'g.')
+    # plt.xlim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
+    # plt.ylim(-np.max(uv) * 1.2, np.max(uv) * 1.2)
+    # plt.show()
+
+def locate_test(offset, no_Ns, total_photons, energy, D):
+    """This test exists to do some statistical testing"""
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    test_I.add_willingale_baseline(D)
+
+    Ns = np.logspace(2, 5, no_Ns)
+    sigmas = np.zeros((no_Ns, 2))
+    freq = 1 / (test_I.baselines[0].L * spc.h * spc.c / (energy * spc.eV * 1e3 * test_I.baselines[0].W))
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos))
+    edges = np.array([test_I.pos_range[0] + i * test_I.res_pos for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    image = images.point_source(int(total_photons), 0., offset, energy)
+    for i, N in enumerate(Ns):
+        print(f'Now doing photon count {N}, which is test {i + 1}')
+        number_of_sims = int(total_photons // (N))
+
+        test_data = process.interferometer_data(test_I, image, int(1e5))
+        pos_data = test_data.pixel_to_pos(test_I)
+
+        phases = np.zeros((number_of_sims))
+        for sim in range(phases.size):
+            y_data, _ = np.histogram(pos_data[int(N*sim):int(N*(sim+1))], edges)
+
+            phases[sim] = np.angle(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / N)
+
+        sigmas[i] = np.array([np.mean(phases), np.std(phases)])
+
+    res_I = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (2 * D) * (3600 * 360 / (2 * np.pi))
+    # res_diff = 1.22 * (spc.h * spc.c / (energy * spc.eV * 1e3)) / D * (3600 * 360 / (2 * np.pi))
+    print(res_I)
+    sigmas *= (test_I.baselines[0].L * spc.h * spc.c / (energy * spc.eV * 1e3 * test_I.baselines[0].W)) / test_I.baselines[0].F * (3600 * 360 / (2 * np.pi)**2)
+    fit_func = lambda N, a: a / np.sqrt(N)
+    fit_p, fit_cov = spopt.curve_fit(fit_func, Ns, sigmas[:,1], p0=(res_I))
+    print(fit_p)
+
+    significants = abs(sigmas[:,0]) > sigmas[:, 1]
+
+    plt.semilogx(Ns, sigmas[:, 0], '.', label='Mean of calculated offsets')
+    plt.errorbar(Ns, sigmas[:,0], yerr=sigmas[:,1], ls='', marker='.')
+    plt.plot([0, Ns[-1]], [-offset, -offset], 'g--', label='Actual offset')
+    plt.legend()
     plt.show()
 
+    plt.semilogx(Ns, fit_func(Ns, *fit_p), label=r'Fit of $\frac{a}{\sqrt{N}}$')
+    plt.semilogx(Ns, fit_func(Ns, res_I), label=r'Fit function with a = $\theta_I$')
+    plt.semilogx(Ns[significants == False], sigmas[significants == False, 1], 'r.', label='Points indistinguishable from 0')
+    plt.semilogx(Ns[significants], sigmas[significants, 1], 'g.', label='Points distinguishable from 0')
+    plt.xlabel('Number of Photons')
+    plt.ylabel('Positional uncertainty (as)')
+    plt.legend()
+    plt.show()
 
+def locate_test_multiple_D(offset, no_Ns, total_photons, energy, Ds):
+    """This test exists to do some statistical testing"""
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    
+    Ns = np.logspace(2, 5, no_Ns)
+    artificial_Ns = np.logspace(2, 5, 10000)
+    sigmas = np.zeros((len(Ds), no_Ns, 2))
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos))
+    edges = np.array([test_I.pos_range[0] + i * test_I.res_pos for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    image = images.point_source(int(total_photons), 0., offset, energy)
+    wavelength = spc.h * spc.c / (energy * spc.eV * 1e3)
+    for i, D in enumerate(Ds):
+        test_I.clear_baselines()
+        test_I.add_willingale_baseline(D)
+        freq = 1 / (test_I.baselines[0].L * wavelength / (test_I.baselines[0].W))
+
+        for j, N in enumerate(Ns):
+            print(f'Now doing photon count {N}, which is test {j + 1}')
+            number_of_sims = int(total_photons // (N))
+
+            test_data = process.interferometer_data(test_I, image, int(1e5))
+            pos_data = test_data.pixel_to_pos(test_I)
+
+            phases = np.zeros((number_of_sims))
+            for sim in range(phases.size):
+                y_data, _ = np.histogram(pos_data[int(N*sim):int(N*(sim+1))], edges)
+
+                phases[sim] = np.angle(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / N)
+
+            sigmas[i, j] = np.array([np.mean(phases), np.std(phases)])
+
+        res_I = (wavelength) / (2 * D) * (3600 * 360 / (2 * np.pi))
+        fit_func = lambda N, a: a * (wavelength/ D) / np.sqrt(N)
+        sigmas[i] *= (test_I.baselines[0].L * wavelength / (test_I.baselines[0].W)) / test_I.baselines[0].F * (3600 * 360 / (2 * np.pi)**2)
+        fit_p, fit_cov = spopt.curve_fit(fit_func, Ns, sigmas[i, :, 1], p0=(res_I))
+
+        plt.semilogx(artificial_Ns, fit_func(artificial_Ns, *fit_p)*1e6, label='Fit of' + f'{fit_p[0]}' + r'$\cdot \frac{\lambda}{D \cdot \sqrt{N}}$ for D = ' + f'{D:.3f}')
+        plt.semilogx(Ns, sigmas[i, :, 1]*1e6, '.', label=f'Data for D = {D:.3f}')
+
+    plt.title(f'Positional uncertainty determined with {total_photons} monochromatic photons of energy {energy} keV at offset {offset*1e6} $\\mu$as')
+    plt.xlabel('Number of Photons')
+    plt.ylabel(r'Positional uncertainty ($\mu$as)')
+    plt.legend()
+    plt.show()
+
+def locate_test_multiple_E(offset, no_Ns, total_photons, energies, D):
+    """This test exists to do some statistical testing"""
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    test_I.add_willingale_baseline(D)
+    
+    Ns = np.logspace(2, 5, no_Ns)
+    artificial_Ns = np.logspace(2, 5, 10000)
+    sigmas = np.zeros((len(energies), no_Ns, 2))
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos) * 100)
+    edges = np.array([test_I.pos_range[0] + i * (test_I.res_pos / 100) for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    colour_list = ['b', 'orange', 'g', 'r', 'purple']
+    p0 = np.zeros((len(energies)))
+
+    for i, energy in enumerate(energies):
+        image = images.point_source(int(total_photons), 0., offset, energy)
+        wavelength = spc.h * spc.c / (energy * spc.eV * 1e3)
+        freq = 1 / (test_I.baselines[0].L * wavelength / (test_I.baselines[0].W))
+
+        for j, N in enumerate(Ns):
+            print(f'Now doing photon count {N}, which is test {j + 1}')
+            number_of_sims = int(total_photons // (N))
+
+            test_data = process.interferometer_data(test_I, image, int(1e5))
+            pos_data = test_data.noisy_pos
+
+            phases = np.zeros((number_of_sims))
+            for sim in range(phases.size):
+                y_data, _ = np.histogram(pos_data[int(N*sim):int(N*(sim+1))], edges)
+
+                phases[sim] = np.angle(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / N)
+
+            sigmas[i, j] = np.array([np.mean(phases), np.std(phases)])
+
+        fit_func = lambda N, a: a * (wavelength / D) / np.sqrt(N) * 3600 * 360 / (2 * np.pi)
+        sigmas[i] *= wavelength / test_I.baselines[0].D * (3600 * 360 / (2 * np.pi)**2)
+        fit_p, fit_cov = spopt.curve_fit(fit_func, Ns, sigmas[i, :, 1], p0=(1))
+        p0[i] = fit_p[0]
+        
+
+        plt.semilogx(artificial_Ns, fit_func(artificial_Ns, p0[i])*1e6, colour_list[i])
+        plt.semilogx(Ns, sigmas[i, :, 1]*1e6, '.', color=colour_list[i], label=f'{energy:.1f} keV, a = {p0[i]:.4f}')
+
+    plt.title(f'Positional uncertainty determined with $10^{int(np.log10(total_photons))}$ monochromatic photons of variable energy at offset {offset*1e6} $\\mu$as')
+    plt.xlabel('Number of Photons')
+    plt.ylabel(r'Positional uncertainty ($\mu$as)')
+    plt.legend()
+    plt.show()
+
+    print(spc.h * spc.c * test_I.baselines[0].L / (np.array(energies) * spc.eV * 1e3 * test_I.baselines[0].W) * 1e6)
+
+def visibility_test_E(no_Ds, no_sims, energy):
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    img_scale = .0004
+    image = images.disc(int(1e5), 0, 0, energy, img_scale / 2)
+    image_2 = images.disc(int(1e5), 0, 0, 2 * energy, img_scale / 2)
+    image_3 = images.disc(int(1e5), 0, 0, 3 * energy, img_scale / 2)
+    image_4 = images.disc(int(1e5), 0, 0, 4 * energy, img_scale / 2)
+
+    Ds = np.linspace(.005, 1, no_Ds)
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos))
+    edges = np.array([test_I.pos_range[0] + i * test_I.res_pos for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    def calc_vis(image, Ds):
+        vis = np.zeros((no_Ds, 2))
+        for i, D in enumerate(Ds):
+            print(f'Now doing baseline length {D}, which is test {i + 1}')
+            test_I.clear_baselines()
+            test_I.add_willingale_baseline(D)
+
+            freq = 1 / (test_I.baselines[0].L * spc.h * spc.c / (image.energies[0] * test_I.baselines[0].W))
+            amps = np.zeros((no_sims, 2))
+
+            for sim in range(no_sims):
+                test_data = process.interferometer_data(test_I, image, 100000)
+
+                y_data, _ = np.histogram(test_data.pixel_to_pos(test_I), edges)
+
+                amps[sim, 0] = np.abs(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size)
+                amps[sim, 1] = np.abs(np.sum(y_data) / y_data.size)
+
+            vis[i, 0] = np.mean(amps[:, 0]) / np.mean(amps[:, 1])
+            vis[i, 1] = np.std(amps[:, 0]) / np.mean(amps[:, 1])
+
+        return vis * 2
+    
+    vis = calc_vis(image, Ds)
+    vis_2 = calc_vis(image_2, Ds)
+    vis_3 = calc_vis(image_3, Ds)
+    vis_4 = calc_vis(image_4, Ds)
+
+    D_theory = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_2 = (spc.h * spc.c / (2 * energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_3 = (spc.h * spc.c / (3 * energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_4 = (spc.h * spc.c / (4 * energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+
+    plt.errorbar(Ds, vis[:, 0], yerr=vis[:, 1], marker='.', ls='-', label=f'{energy:.1f} keV')
+    plt.vlines(D_theory, vis[:, 0].min(), vis[:, 0].max(), 'b', alpha=.3)
+    plt.errorbar(Ds, vis_2[:, 0], yerr=vis_2[:, 1], marker= '.', ls='-.', label=f'{2 * energy:.1f} keV')
+    plt.vlines(D_theory_2, vis_2[:, 0].min(), vis_2[:, 0].max(), 'orange', alpha=.3)
+    plt.errorbar(Ds, vis_3[:, 0], yerr=vis_3[:, 1], marker= '.', ls=':', label=f'{3 * energy:.1f} keV')
+    plt.vlines(D_theory_3, vis_3[:, 0].min(), vis_3[:, 0].max(), 'g', alpha=.3)
+    plt.errorbar(Ds, vis_4[:, 0], yerr=vis_4[:, 1], marker= '.', ls='--', label=f'{4 * energy:.1f} keV')
+    plt.vlines(D_theory_4, vis_4[:, 0].min(), vis_4[:, 0].max(), 'r', alpha=.3)
+    plt.title(f'Average of {no_sims} observations of uniform disc with {img_scale/2:.4f} radius at variable keV')
+    plt.xlabel('Baseline length (m)')
+    plt.ylabel('Visibility')
+    plt.legend()
+    plt.show()
+
+def visibility_test_scale(no_Ds, no_sims, energy):
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    img_scale = .0004
+    image = images.disc(int(1e5), 0, 0, energy, img_scale / 2)
+    image_2 = images.disc(int(1e5), 0, 0, energy, 2 * img_scale / 2)
+    image_3 = images.disc(int(1e5), 0, 0, energy, 3 * img_scale / 2)
+    image_4 = images.disc(int(1e5), 0, 0, energy, 4 * img_scale / 2)
+
+    Ds = np.linspace(.005, 1, no_Ds)
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos))
+    edges = np.array([test_I.pos_range[0] + i * test_I.res_pos for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    def calc_vis(image, Ds):
+        vis = np.zeros((no_Ds, 2))
+        for i, D in enumerate(Ds):
+            print(f'Now doing baseline length {D}, which is test {i + 1}')
+            test_I.clear_baselines()
+            test_I.add_willingale_baseline(D)
+
+            freq = 1 / (test_I.baselines[0].L * spc.h * spc.c / (image.energies[0] * test_I.baselines[0].W))
+            amps = np.zeros((no_sims, 2))
+
+            for sim in range(no_sims):
+                test_data = process.interferometer_data(test_I, image, 100000)
+
+                y_data, _ = np.histogram(test_data.pixel_to_pos(test_I), edges)
+
+                amps[sim, 0] = np.abs(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size)
+                amps[sim, 1] = np.abs(np.sum(y_data) / y_data.size)
+
+            vis[i, 0] = np.mean(amps[:, 0]) / np.mean(amps[:, 1])
+            vis[i, 1] = np.std(amps[:, 0]) / np.mean(amps[:, 1])
+
+        return vis * 2
+    
+    vis = calc_vis(image, Ds)
+    vis_2 = calc_vis(image_2, Ds)
+    vis_3 = calc_vis(image_3, Ds)
+    vis_4 = calc_vis(image_4, Ds)
+
+    D_theory = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_2 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (2 * img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_3 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (3 * img_scale * 2 * np.pi / (3600 * 360))
+    D_theory_4 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (4 * img_scale * 2 * np.pi / (3600 * 360))
+
+    plt.errorbar(Ds, vis[:, 0], yerr=vis[:, 1], marker='.', ls='-', label=f'{img_scale:.4f} as')
+    plt.vlines(D_theory, vis[:, 0].min(), vis[:, 0].max(), 'b', alpha=.3)
+    plt.errorbar(Ds, vis_2[:, 0], yerr=vis_2[:, 1], marker= '.', ls='-.', label=f'{2 * img_scale:.4f} as')
+    plt.vlines(D_theory_2, vis_2[:, 0].min(), vis_2[:, 0].max(), 'orange', alpha=.3)
+    plt.errorbar(Ds, vis_3[:, 0], yerr=vis_3[:, 1], marker= '.', ls=':', label=f'{3 * img_scale:.4f} as')
+    plt.vlines(D_theory_3, vis_3[:, 0].min(), vis_3[:, 0].max(), 'g', alpha=.3)
+    plt.errorbar(Ds, vis_4[:, 0], yerr=vis_4[:, 1], marker= '.', ls='--', label=f'{4 * img_scale:.4f} as')
+    plt.vlines(D_theory_4, vis_4[:, 0].min(), vis_4[:, 0].max(), 'r', alpha=.3)
+    plt.title(f'Average of {no_sims} observations of uniform disc with {img_scale/2:.4f} radius at variable keV')
+    plt.xlabel('Baseline length (m)')
+    plt.ylabel('Visibility')
+    plt.legend()
+    plt.show()
+    
+def visibility_test_2(no_Ds, no_sims, energy):
+    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+                                        0.00, None, instrument.interferometer.smooth_roller, 
+                                        .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
+    img_scale = .0004
+    image = images.disc(int(1e5), 0, 0, energy, img_scale / 2)
+
+    Ds = np.linspace(0.05, 5, no_Ds)
+    vis = np.zeros((no_Ds, 2))
+
+    bins = int(np.ceil(abs(test_I.pos_range[0] - test_I.pos_range[1]) / test_I.res_pos))
+    edges = np.array([test_I.pos_range[0] + i * test_I.res_pos for i in range(bins + 1)])
+    centres = edges[:-1] + (edges[1:] - edges[:-1])/2
+
+    freq = 1 / (test_I.baselines[0].L * spc.h * spc.c / (energy * spc.eV * 1e3 * test_I.baselines[0].W))
+
+    for i, D in enumerate(Ds):
+        print(f'Now doing baseline length {D}, which is test {i + 1}')
+        test_I.clear_baselines()
+        test_I.add_willingale_baseline(D)
+
+        amps = np.zeros((no_sims, 2))
+
+        for sim in range(no_sims):
+            test_data = process.interferometer_data(test_I, image, 100000)
+            y_data, _ = np.histogram(test_data.pixel_to_pos(test_I), edges)
+
+            amps[sim, 0] = np.abs(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size)
+            amps[sim, 1] = np.abs(np.sum(y_data) / y_data.size)
+
+        vis[i, 0] = np.mean(amps[:, 0]) / np.mean(amps[:, 1])
+        vis[i, 1] = np.std(amps[:, 0]) / np.mean(amps[:, 1])
+
+    D_theory = 1.22 *  (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
+
+    plt.errorbar(Ds, vis[:, 0], yerr=vis[:, 1], marker='.', ls='', label=f'{energy} eV')
+    plt.vlines(D_theory, vis[:, 0].min(), vis[:, 0].max(), 'b')
+    plt.xlabel('Baseline length (m)')
+    plt.ylabel('Visibility')
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     #TODO fix times of arrival
@@ -1009,9 +1348,14 @@ if __name__ == "__main__":
     # sinetier_test()
     # full_image_test(0)
     # image_re_test_point()
-    # image_re_test_parts()
-    image_re_test_exact()
+    image_re_test_parts()
+    # image_re_test_exact()
     # image_re_test_uv()
     # full_image_test(0)
     # stats_test()
+    # locate_test(1e-6, 10, 1e7, 1.2, 1)
+    # locate_test_multiple_E(1e-6, 10, 1e6, [1.2, 2.4, 3.6, 4.8, 6], 1)
+    # visibility_test_E(20, 5, 1.2)
+    # visibility_test_scale(20, 5, 1.2)
+    # visibility_test_2(50, 10, 1.2)
     pass

@@ -15,8 +15,11 @@ import numpy as np
 # print(theta(Ds, Fs) * 3600 * 360 / (2*np.pi))
 # print(np.log10(-(0.0004371 - 1.616e-7) / (0.02 - 10)))
 
-test = dict(D = 5, F = 7)
+# test = dict(D = 5, F = 7)
 
-test_array = np.array([test, test, test])
-test['D'] += 5
-print(test['D'])
+# test_array = np.array([test, test, test])
+# test['D'] += 5
+# print(test['D'])
+
+test = np.array([True, True, False])
+print(test.nonzero()[0].size)

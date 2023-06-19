@@ -4,6 +4,8 @@ It will also contain methods used for manipulating these virtual instruments as 
 """
 
 import numpy as np
+import scipy.constants as spc
+
 
 class baseline():
     """
@@ -46,9 +48,9 @@ class interferometer():
 
         res_E (float) = Energy resolution of CCD's in instrument (in KeV)\n
         res_t (float) = Time resolution of CCD's in instrument (seconds)\n
-        res_pos (float) = Length from last mirror to CCD surface (in meters)\n
-        E_range (array-like of floats) = Incident photon beam width (in micrometers)\n
-    	pos_range (array-like of floats) = Effective focal length of interferometer (in meters)\n
+        res_pos (float) = Position resolution of CCD's in instrument (in micrometers)\n
+        E_range (array-like of floats) = Range of energies that can be recorded (in KeV)\n
+    	pos_range (array-like of floats) = Range of positions that can be recorded (in micrometers)\n
         wobble_I (float) = Intensity of wobble effect, used as sigma in normally distributed random walk steps. Default is 0, which means no wobble. (in arcsec)\n
         wobble_c (function) = Function to use to correct for spacecraft wobble in observation (possibly not relevant here)\n
         roller (function) = Function to use to simulate the spacecraft rolling. Options are 'smooth_roll' and 'discrete_roll'.\n
@@ -57,22 +59,14 @@ class interferometer():
         roll_stop_a (float) = Indicator for at what angle increments spacecraft rests at if using 'discrete_roll'. Default is 0, meaning it doesn't stop. (in rads)\n
         """
 
-        # # Setting target values for changeable parameters
-        # # These are necessary to track their changes over time
-        # self.target_D = D
-
         self.baselines = []
 
-        # Roll direction, to support filling out entire u,v plane
-        # Standard is pi/2 since the default axis of measurement in literature is the y-axis
-        self.roll = 0
-
         # Different resolutions, with energy, time and pixel size.
-        self.res_E = res_E * 1.602177733e-16
+        self.res_E = res_E * 1e3 * spc.eV
         self.res_t = res_t
         self.res_pos = res_pos * 10**-6
 
-        self.E_range = E_range * 1.602177733e-16
+        self.E_range = E_range * 1e3 * spc.eV
         self.pos_range = pos_range * 10**-6
 
         self.wobble_I = wobble_I
@@ -195,3 +189,6 @@ class interferometer():
 
     def add_willingale_baseline(self, D):
         self.baselines.append(baseline(D, 10, 300, D/(2*np.tan(6 * np.pi / (3600 * 360)))))
+
+    def clear_baselines(self):
+        self.baselines.clear()

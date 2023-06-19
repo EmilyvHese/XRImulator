@@ -24,7 +24,7 @@ class interferometer_data():
     Does not contain manipulation methods, data inside will have to be edited via external methods.
     """
 
-    def __init__(self, instrument, image, N_f, samples, noise=False):
+    def __init__(self, instrument, image, samples, noise=False):
         """ 
         This function is the main function that takes an image and converts it to instrument data as
         if the instrument had just observed the object te image is a representation of. 
@@ -42,17 +42,15 @@ class interferometer_data():
         """
         # Useful shorthand
         self.size = image.size
+        self.noise = noise
 
         self.process_photon_energies(instrument, image)
         self.discretize_E(instrument)
         self.process_photon_toa(instrument, image)
         self.discretize_t(instrument)
 
-        #TODO look into using pdf
-        self.process_photon_dpos(instrument, image, N_f, samples)
+        self.process_photon_dpos(instrument, image, samples)
         self.discretize_pos(instrument)
-
-        self.test_sin()
 
     def process_photon_energies(self, instrument, image):
         """
@@ -61,8 +59,10 @@ class interferometer_data():
         """
 
         self.image_energies = image.energies
-        # self.energies = np.random.normal(self.image_energies, instrument.res_E)
-        self.energies = self.image_energies
+        if self.noise:
+            self.energies = np.random.normal(self.image_energies, self.image_energies/10)
+        else:
+            self.energies = self.image_energies
 
     def process_photon_toa(self, instrument, image):
         """
@@ -71,12 +71,14 @@ class interferometer_data():
         """
 
         self.image_toa = image.toa
-        # self.toa = np.random.normal(self.image_toa, instrument.res_t)
-        # Forcing it to be impossible for photons to arrive late
-        # self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
-        self.toa = self.image_toa
+        if self.noise:
+            self.toa = np.random.normal(self.image_toa, instrument.res_t)
+            # Forcing it to be impossible for photons to arrive late
+            self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
+        else:
+            self.toa = self.image_toa
 
-    def process_photon_dpos(self, instrument, image, N_f, samples):
+    def process_photon_dpos(self, instrument, image, samples):
         """
         This function is a helper function for process_image that specifically processes the locations where photons impact
         on the detector (hence the d(etector)pos(ition) name). Not to be used outside the process_image context.
@@ -84,18 +86,18 @@ class interferometer_data():
         Paramater definitions can be found in process_image.
         """
 
-        def fre_dif(N_f, samples):
+        def fre_dif(wavelength, baseline):
             """
             Helper function that calculates the fresnell difraction pattern for two overlapping
             beams such as is the case in the interferometer. Does so according to a specified number
             of fringes to model out to, and a number of samples to use to interpolate between.
             """
-            u_0 = np.sqrt(2 * N_f)
+            u_0 = baseline.W * np.sqrt(2 / (wavelength * baseline.L))
             u_1 = lambda u, u_0: u + u_0/2
             u_2 = lambda u, u_0: u - u_0/2
 
             # Times 3 to probe a large area for the later interpolation
-            u = np.linspace(-u_0, u_0, samples) * 3
+            u = np.linspace(-u_0, u_0, samples)
 
             S_1, C_1 = sps.fresnel(u_1(u, u_0))
             S_2, C_2 = sps.fresnel(u_2(u, u_0))
@@ -103,54 +105,48 @@ class interferometer_data():
             A = (C_2 - C_1 + 1j*(S_2 - S_1)) * (1 + np.exp(np.pi * 1j * u_0 * u))
             A_star = np.conjugate(A)
 
-            I = A * A_star
-            I_pdf = I / sum(I)
+            I = np.abs(A * A_star)
+            I_pmf = I / sum(I)
 
-            return spinter.interp1d(u, I_pdf, bounds_error=False, fill_value=0)
+            return I_pmf, u
 
-        self.actual_pos = np.zeros((self.size, 2))
-        # Calculating photon wavelengths and phases from their energies
-        lambdas = spc.h * spc.c / image.energies
+        self.actual_pos = np.zeros(self.size)
 
         # Randomly selecting a baseline for the photon to go in. 
         self.baseline_indices = np.random.randint(0, len(instrument.baselines), self.size)
 
-        # Getting data from those baselines that is necessary for further calculations.
-        # Must be done this way since baselines[unacc_ind].W doesn't go element-wise, and .W is not an array operation
-        baseline_data = np.array([[instrument.baselines[index].W, 
-                                    instrument.baselines[index].F,
-                                    instrument.baselines[index].L] for index in self.baseline_indices])
-
-        # Calculating the fresnell diffraction pattern for set number of fringes and samples
-        self.inter_pdf = fre_dif(N_f, samples)
-
         # Defining the pointing, relative position and off-axis angle for each photon over time.
         # Relative position is useful for the calculation of theta, since the off-axis angle is very dependent on where the axis is.
-        # There is a 1e-20 factor in a denominator, to prevent divide by zero errors. Typical values for pos_rel are all much larger, 
-        # so this does not simply move the problem.
         self.pointing = instrument.gen_pointing(np.max(image.toa))
         pos_rel = self.pointing[image.toa, :2] - image.loc
         theta = np.cos(self.pointing[image.toa, 2] - np.arctan2(pos_rel[:, 0], pos_rel[:, 1])) * np.sqrt(pos_rel[:, 0]**2 + pos_rel[:, 1]**2)
 
-        # Doing an accept/reject method to find the precise location photons impact at.
-        # This array records which photons are accepted so far, starting as all False and becoming True when one is accepted
-        accepted_array = np.full(image.size, False, bool)
-        while np.any(accepted_array == False):
-            # Indices of all unaccepted photons, which are the only ones that need to be generated again each loop.
-            unacc_ind = np.nonzero(accepted_array == False)[0]
+        # Here the actual drawing of photons happens, in two for loops since both looped variables impact the diffraction pattern.
+        # Only populated energy channels are selected.
+        for channel in np.unique(self.discrete_E):
+            # Here each photon in the current energy channel is selected, and a wavelength corresponding to the energy is calculated.
+            photons_in_channel = self.discrete_E == channel
+            wavelength = spc.h * spc.c / ((channel + .5) * instrument.res_E + instrument.E_range[0])
 
-            # Generating new photons for all the unaccepted indices with accurate y-locations and random intensities.
-            photon_y = (np.random.rand(unacc_ind.size) * baseline_data[unacc_ind, 0] - baseline_data[unacc_ind, 0]/2)
+            # Again, only populated baselines are selected
+            for baseline_i in np.unique(self.baseline_indices[photons_in_channel]):
+                # Here each photon in both the baseline and energy channel is selected, and the baseline is called to shorten later calls to it. 
+                photons_to_generate = self.baseline_indices[photons_in_channel] == baseline_i
+                baseline = instrument.baselines[baseline_i]
 
-            # Converting y positions to u positions for scaling the fresnell diffraction to            
-            photon_u = (photon_y + baseline_data[unacc_ind, 1] * theta[unacc_ind]) * np.sqrt(2 / (lambdas[unacc_ind] * baseline_data[unacc_ind, 2]))
-            photon_fresnell = self.inter_pdf(photon_u)
-            
-            photon_I = np.random.rand(unacc_ind.size) * np.amax(photon_fresnell) 
-
-            # Checking which photons will be accepted, and updating the accepted_array accordingly
-            accepted_array[unacc_ind] = photon_I <= photon_fresnell
-            self.actual_pos[unacc_ind, 1] = photon_y
+                # The diffraction pattern point mass function and the sampled locations are calculated, and then sampled.
+                diffraction_pattern, u_samples = fre_dif(wavelength, baseline)
+                u_pos = np.random.choice(u_samples,
+                                            photons_to_generate.nonzero()[0].size, 
+                                            replace=True, 
+                                            p=diffraction_pattern)
+                
+                # Here the sampled Fresnell u position is converted to a physical detector position.
+                self.actual_pos[photons_to_generate] = (u_pos / np.sqrt(2 / (wavelength * baseline.L)) 
+                                - baseline.F * theta[photons_to_generate])
+        
+        # Noises up the data
+        self.noisy_pos = self.actual_pos + np.random.normal(0, instrument.res_pos, self.actual_pos.size)
 
     def discretize_E(self, ins):
         """
@@ -164,7 +160,7 @@ class interferometer_data():
 
     def channel_to_E(self, ins):
         """ Method that turns discretized energies into the energies at the center of their respective channels. """
-        return (self.discrete_E + 1) * ins.res_E + ins.E_range[0] + ins.res_E / 2
+        return (self.discrete_E + .5) * ins.res_E + ins.E_range[0]
 
     def discretize_pos(self, ins):
         """
@@ -192,9 +188,4 @@ class interferometer_data():
 
     def tstep_to_t(self, ins):
         """ Method that turns discretized time steps into the times at the center of their respective steps. """
-        return (self.discrete_t + 1) * ins.res_t + self.toa[0] + ins.res_t / 2
-
-    def test_sin(self):
-        self.test_data = np.zeros(self.size)
-        for i in range(self.size):
-            self.test_data[i] = np.sin(i * 1500)
+        return (self.discrete_t + .5) * ins.res_t
