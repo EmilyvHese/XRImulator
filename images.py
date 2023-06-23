@@ -5,7 +5,6 @@ each with location and time of arrival and energy.
 
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.constants as spc
 
 
@@ -26,12 +25,8 @@ class image():
         # Array containing coordinates of origin for each photon.
         self.loc = np.zeros((size, 2))
 
-        #TODO add further relevant arrays. At least one that defines arrival location
-
         # Useful to have as shorthand
         self.size = size
-
-#TODO add image generators (after full image data types and such are figured out.) 
 
 def point_source(size, alpha, beta, energy):
     """
@@ -92,7 +87,7 @@ def m_point_sources(size, m, alpha, beta, energy):
 
     return im
 
-def point_source_multichromatic(size, alpha, beta, energy):
+def point_source_multichromatic_range(size, alpha, beta, energy):
     """
     Function that generates an image of a multichromatic point source according to some specifications.
 
@@ -111,7 +106,30 @@ def point_source_multichromatic(size, alpha, beta, energy):
 
     return im
 
-def disc(size, alpha, beta, energy, radius):
+def point_source_multichromatic_gauss(size, alpha, beta, energy, energy_spread):
+    """
+    Function that generates an image of a multichromatic point source according to some specifications.
+
+    Parameters:
+
+    size (int) = number of photons to generate from this source.\n
+    alpha (float) = coordinate offset from zero pointing in x-direction (arcsec)\n
+    beta (float) = coordinate offset from zero pointing in y-direction (arcsec)\n
+    energy (float) = mean energy of photons to generate (KeV)\n
+    energy_spread (float) = spread in energy of photons to generate (KeV)\n
+    """
+    im = image(size)
+    im.energies = np.random.normal(energy, energy_spread, size) * spc.eV * 1e3
+    for i in range(0, size):
+        im.loc[i] = np.array([alpha, beta]) * 2 * np.pi / (3600 * 360)
+        im.toa[i] = i
+
+    return im
+
+def disc(size, alpha, beta, energy, radius, energy_spread=0.):
+    """
+    A function that generates photons in the shape of a continuous disk.
+    """
     im = image(size)
     for i in range(0, size):
         im.energies[i] = energy * spc.eV * 1e3
@@ -120,9 +138,22 @@ def disc(size, alpha, beta, energy, radius):
         theta = np.random.random() * 2 * np.pi
         im.loc[i] = np.array([alpha + r * np.cos(theta), beta + r * np.sin(theta)]) * 2 * np.pi / (3600 * 360) 
 
+    if energy_spread > 0.:
+        im.energies += np.random.normal(0, energy_spread, size)
+
     return im
 
-def generate_from_image(image_path, no_photons, img_scale, energy, offset=[0,0]):
+def generate_from_image(image_path, no_photons, img_scale, energy, energy_spread=0., offset=[0,0]):
+    """
+    Function that generates an image object from any arbitrary input image. 
+    useful for testing realistic astrophysical sources without having to include code to simulate them here.
+    Just have some other simulator generate an image and use this function to read that out.
+    This function uses relative brightness of each part of the input image to generate a pmf defined at each pixel location of the image.
+    This pmf is then sampled for however many photons are required. 
+    #TODO This function could be adapted so that some colour scale on the input image could indicate relative energy of photons coming from
+    each pixel, with an energy scale given so that a more realistic energy distribution is modeled. As it stands, the function gives each
+    photon the same given energy, possibly with a gaussian spread.
+    """
     photon_img = image(no_photons)
     # Load the image and convert it to grayscale
     img = Image.open(image_path).convert('L')
@@ -153,8 +184,8 @@ def generate_from_image(image_path, no_photons, img_scale, energy, offset=[0,0])
         photon_img.energies[i] = energy * spc.eV * 1e3
         photon_img.toa[i] = i 
 
-    return photon_img, pix_scale
+    # Adds a spread to the energies if given.
+    if energy_spread > 0.:
+        photon_img.energies += np.random.normal(0, energy_spread * spc.eV * 1e3, no_photons)
 
-# if __name__ == "__main__":
-    # im = point_source(10, 1, 2, 5)
-    # print(im.energies, '\n', im.loc, '\n', im.toa)
+    return photon_img, pix_scale

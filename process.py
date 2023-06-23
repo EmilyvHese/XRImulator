@@ -7,15 +7,9 @@ definition for the interferometer_data class, which acts as the standardised dat
 in the functions in analysis.py.
 """
 
-from turtle import pos
 import numpy as np
-import instrument as ins
 import scipy.constants as spc
 import scipy.special as sps
-import scipy.interpolate as spinter
-import matplotlib
-import matplotlib.pyplot as plt
-import time
 
 class interferometer_data():
     """ 
@@ -24,7 +18,7 @@ class interferometer_data():
     Does not contain manipulation methods, data inside will have to be edited via external methods.
     """
 
-    def __init__(self, instrument, image, samples, noise=False):
+    def __init__(self, instrument, image, samples, pos_noise=0., energy_noise=0., t_noise=0.):
         """ 
         This function is the main function that takes an image and converts it to instrument data as
         if the instrument had just observed the object te image is a representation of. 
@@ -34,19 +28,23 @@ class interferometer_data():
 
         Parameters:\n
 
-        instrument (interferometer class object): Instrument object to be used to simulate observing the image.
-        image (image class object): Image object to be observed.\n
-        N_f (int): number of fringes we want to consistently see.\n
-        samples (int): number of samples to use for approximating fresnell difraction pattern.\n
-        noise (boolean) = Whether or not to include Gaussian noise, with default False for not including it.\n
+        instrument (interferometer class object) = Instrument object to be used to simulate observing the image.\n
+        image (image class object) = Image object to be observed.\n
+        N_f (int) = number of fringes we want to consistently see.\n
+        samples (int) = number of samples to use for approximating fresnell difraction pattern.\n
+        pos_noise (float) = Noise value in micrometers used as sigma in normal distribution around 'true' position. Default 0. means no noise.\n
+        energy_noise (float) = Noise value used as percentage of 'true' energy to determine sigma in normal distribution. Default 0. means no noise.\n
+        t_noise (float) = Noise value in seconds used as sigma in normal distribution around 'true' time of arrival. Default 0. means no noise.\n
         """
         # Useful shorthand
         self.size = image.size
-        self.noise = noise
+        self.pos_noise = pos_noise * 1e-6
+        self.energy_noise = energy_noise * spc.eV * 1e3
+        self.t_noise = t_noise
 
         self.process_photon_energies(instrument, image)
         self.discretize_E(instrument)
-        self.process_photon_toa(instrument, image)
+        self.process_photon_toa(image)
         self.discretize_t(instrument)
 
         self.process_photon_dpos(instrument, image, samples)
@@ -59,22 +57,26 @@ class interferometer_data():
         """
 
         self.image_energies = image.energies
-        if self.noise:
-            self.energies = np.random.normal(self.image_energies, self.image_energies/10)
+        if self.energy_noise > 0.:
+            # % is for forcing it to be impossible for photons to be measured above or below energy range, while keeping random distribution
+            # If you want to avoid high energies bleeding over in the case of for example an emission line you want to image,
+            # simply set the energy range too big to have this contamination. 
+            self.energies = ((self.image_energies + np.random.normal(0, self.energy_noise, self.size) - instrument.E_range[0])
+                                             % (instrument.E_range[1] - instrument.E_range[0]) 
+                                             + instrument.E_range[0])
         else:
             self.energies = self.image_energies
 
-    def process_photon_toa(self, instrument, image):
+    def process_photon_toa(self, image):
         """
         This function is a helper function for process_image that specifically processes the times at which photons arrive and
         how the instrument records them.
         """
 
         self.image_toa = image.toa
-        if self.noise:
-            self.toa = np.random.normal(self.image_toa, instrument.res_t)
-            # Forcing it to be impossible for photons to arrive late
-            self.toa[self.toa > np.amax(image.toa)] = np.amax(image.toa)
+        if self.t_noise > 0.:
+            # % is for forcing it to be impossible for photons to arrive late or early, while keeping random distribution
+            self.toa = np.random.normal(self.image_toa, self.t_noise, self.size) % np.max(self.image_toa)
         else:
             self.toa = self.image_toa
 
@@ -123,15 +125,15 @@ class interferometer_data():
 
         # Here the actual drawing of photons happens, in two for loops since both looped variables impact the diffraction pattern.
         # Only populated energy channels are selected.
-        for channel in np.unique(self.discrete_E):
+        for channel in np.unique(self.actual_discrete_E):
             # Here each photon in the current energy channel is selected, and a wavelength corresponding to the energy is calculated.
-            photons_in_channel = self.discrete_E == channel
-            wavelength = spc.h * spc.c / ((channel + .5) * instrument.res_E + instrument.E_range[0])
+            photons_in_channel = self.actual_discrete_E == channel
+            wavelength = spc.h * spc.c / ((channel + .5) * (instrument.res_E / 10) + instrument.E_range[0])
 
             # Again, only populated baselines are selected
             for baseline_i in np.unique(self.baseline_indices[photons_in_channel]):
                 # Here each photon in both the baseline and energy channel is selected, and the baseline is called to shorten later calls to it. 
-                photons_to_generate = self.baseline_indices[photons_in_channel] == baseline_i
+                photons_to_generate = (self.baseline_indices == baseline_i) * photons_in_channel
                 baseline = instrument.baselines[baseline_i]
 
                 # The diffraction pattern point mass function and the sampled locations are calculated, and then sampled.
@@ -140,13 +142,18 @@ class interferometer_data():
                                             photons_to_generate.nonzero()[0].size, 
                                             replace=True, 
                                             p=diffraction_pattern)
-                
+                                
                 # Here the sampled Fresnell u position is converted to a physical detector position.
                 self.actual_pos[photons_to_generate] = (u_pos / np.sqrt(2 / (wavelength * baseline.L)) 
                                 - baseline.F * theta[photons_to_generate])
         
         # Noises up the data
-        self.noisy_pos = self.actual_pos + np.random.normal(0, instrument.res_pos, self.actual_pos.size)
+        if self.pos_noise > 0.:
+            self.pos = ((self.actual_pos + np.random.normal(0, self.pos_noise, self.size) - instrument.pos_range[0])
+                                             % (instrument.pos_range[1] - instrument.pos_range[0]) 
+                                             + instrument.pos_range[0])
+        else:
+            self.pos = self.actual_pos
 
     def discretize_E(self, ins):
         """
@@ -157,6 +164,12 @@ class interferometer_data():
         ins (interferometer-class object): object containing the specifications for discretisation.\n
         """
         self.discrete_E = (self.energies - ins.E_range[0]) // ins.res_E
+
+        # Also discretizing the actual energy for use in determining the photon position, but with higher resolution than 
+        # we can measure the actual energy (factor 10 is arbitrary). The discretization is a necesary evil to avoid having
+        # to generate pmfs for each individual photon, and we need to discretize the actual photon energies since the 
+        # potential readout noise on energy measurements wouldn't impact the locations photons actually arrive at.
+        self.actual_discrete_E = (self.image_energies - ins.E_range[0]) // (ins.res_E / 10)
 
     def channel_to_E(self, ins):
         """ Method that turns discretized energies into the energies at the center of their respective channels. """
@@ -170,7 +183,7 @@ class interferometer_data():
         Parameters:
         ins (interferometer-class object): object containing the specifications for discretisation.\n
         """
-        self.discrete_pos = (self.actual_pos - ins.pos_range[0]) // ins.res_pos 
+        self.discrete_pos = (self.pos - ins.pos_range[0]) // ins.res_pos 
         
     def pixel_to_pos(self, ins):
         """ Method that turns discretized positions into the positions at the center of their respective pixels. """

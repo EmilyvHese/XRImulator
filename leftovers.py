@@ -548,3 +548,6 @@ def process_photon_dpos(self, instrument, image, N_f, samples):
         #     # Checking which photons will be accepted, and updating the accepted_array accordingly
         #     accepted_array[unacc_ind] = photon_I <= photon_fresnell
         #     self.actual_pos[unacc_ind, 1] = photon_y 
+
+ind_in_range = (((pointing[time_data, 2] % (2 * np.pi)) >= roll) * 
+                ((pointing[time_data, 2] % (2 * np.pi)) < roll + point_binsize))

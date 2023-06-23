@@ -21,5 +21,7 @@ import numpy as np
 # test['D'] += 5
 # print(test['D'])
 
-test = np.array([True, True, False])
-print(test.nonzero()[0].size)
+# test = np.array([True, True, False])
+# print(test.nonzero()[0].size)
+
+print(-5 % 7)

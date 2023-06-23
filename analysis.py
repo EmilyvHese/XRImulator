@@ -8,6 +8,7 @@ import scipy.fft as ft
 import scipy.constants as spc
 import scipy.interpolate as spinter
 
+import time
 
 def hist_data(data, binsno, pixs = False, num = 0):
     """
@@ -70,7 +71,8 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
         samples (int): N for the NxN matrix that is the uv-plane used for the 2d inverse fourier transform.
         
     Returns:
-        array, array: Two arrays, first of which is the recovered image, second of which is the array used in the ifft.
+        array, array, array: Three arrays, first of which is the reconstructed image, 
+                                second and third of which are the fourier transforms and associated uv coordinates of each roll bin + energy channel combination.
     """    
 
     def inverse_fourier(f_values, uv):
@@ -104,64 +106,79 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
     # These arrays are all copied locally to reduce the amount of cross-referencing to other objects required.  
     pos_data = data.pixel_to_pos(instrument)
     time_data = data.discrete_t
-    E_channels = np.unique(data.discrete_E)
+    E_data = data.discrete_E
+    E_to_joules = lambda E: ((E + .5) * instrument.res_E + instrument.E_range[0])
     base_ind = data.baseline_indices
     pointing = data.pointing
 
     # Determing the binning of the roll angle and the number of points to be sampled in the uv-plane for later use.
+    roll_bin_data = ((pointing[time_data, 2] % (2 * np.pi)) // point_binsize).astype(int)
     roll_bins = np.arange(0, 2 * np.pi, point_binsize)
-    uv_points = roll_bins.size * len(instrument.baselines) * 2 * E_channels.size
+    uv_points = roll_bins.size * len(instrument.baselines) * 2 * np.unique(E_data).size
     
     # Generating the arrays that will contain the uv coordinates and associated fourier values covered by the interferometer.
     uv = np.zeros((uv_points, 2))
     f_values = np.zeros(uv_points, dtype=np.complex_)
 
+    # This is for indexing the above two arrays
+    i = 0
+    
     bins = int(np.ceil(abs(instrument.pos_range[0] - instrument.pos_range[1]) / instrument.res_pos))
     edges = np.array([instrument.pos_range[0] + i * instrument.res_pos for i in range(bins + 1)])
     centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
-    # This is for indexing the above two arrays
-    i = 0
+    start = time.time()
+    # Looking only at the baselines that have associated photons
+    for k in np.unique(base_ind):
+        # Taking only relevant photons from the current baseline
+        ind_in_baseline = base_ind == k
+        
+        # Reducing the data we take with us to the other steps
+        roll_bin = roll_bin_data[ind_in_baseline]
+        data_bin = pos_data[ind_in_baseline]
+        E_bin = E_data[ind_in_baseline]
 
-    for roll in roll_bins:
-        # Binning data based on roll angle.
-        # Retrieving all the indices of photons that are in the bin to later use to slice the data.
-        ind_in_range = (((pointing[time_data, 2] % (2 * np.pi)) >= roll) * 
-                        ((pointing[time_data, 2] % (2 * np.pi)) < roll + point_binsize))
+        baseline = instrument.baselines[k]
 
-        # If no photons are in range, everything below can be skipped
-        if ind_in_range.any():
-            # Reducing the data we take with us to the other steps
-            data_bin = pos_data[ind_in_range]
-            base_bin = base_ind[ind_in_range]
+        for E in np.unique(E_bin):
+            # Further slicing of data, taking only photons of a single energy
+            ind_in_channel = E_bin == E
+            roll_bin_E = roll_bin[ind_in_channel]
+            data_bin_E = data_bin[ind_in_channel]
 
-            for k in np.unique(base_bin):
-                # Setting up data for the fourier transform, taking only relevant photons from the current baseline
-                data_bin_k = data_bin[base_bin == k]
-                y_data, _ = np.histogram(data_bin_k, edges)
+            # Calculating the wavelength of light we are dealing with, and the frequency that this baseline covers in the uv-plane with it.
+            lam_bin = spc.h * spc.c / E_to_joules(E)
+            freq_baseline = baseline.D / lam_bin
 
-                for E in E_channels:
-                    # Calculating the wavelength of light we are dealing with, and the frequency that this baseline covers in the uv-plane with it.
-                    lam_bin = spc.h * spc.c / ((E + .5) * instrument.res_E + instrument.E_range[0])
-                    freq_baseline = instrument.baselines[k].D / lam_bin
+            # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
+            freq = 1 / (baseline.L * lam_bin / baseline.W)
+
+            for roll in np.unique(roll_bin_data):
+                # Binning data based on roll angle.
+                # Retrieving all the indices of photons that are in the bin to later use to slice the data.
+                ind_in_range = roll_bin_E == roll
+
+                data_bin_roll = data_bin_E[ind_in_range]
+
+                if data_bin_roll.size > 10:
+                    y_data, _ = np.histogram(data_bin_roll, edges)
 
                     # Calculating u and v for middle of current bin by taking a projection of the current frequency
-                    u = freq_baseline * np.sin(roll  + point_binsize / 2)
-                    v = freq_baseline * np.cos(roll  + point_binsize / 2)
-
-                    # Calculating the frequency we will be doing the fourier transform for, which is the frequency we expect the fringes to appear at.
-                    freq = 1 / (instrument.baselines[k].L * lam_bin / instrument.baselines[k].W)
+                    angle = roll_bins[roll] + point_binsize / 2
+                    u = freq_baseline * np.sin(angle)
+                    v = freq_baseline * np.cos(angle)
 
                     # Calculating value of the fourier transform for the current frequency and bin
                     uv[i] = np.array([u, v])
                     f_values[i] = np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size
 
-                    # Doinng the same with the negative frequency
-                    uv[i+1] = np.array([-u, -v])
-                    # TODO test this as just complex conjugate of other
+                    # Doing the same with the negative frequency
+                    uv[i+1] -= uv[i] 
                     f_values[i+1] = np.conjugate(f_values[i])
 
                     i += 2  
+
+    print(f'Calculating fourier transforms took {time.time() - start:.3f} seconds')
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
     return inverse_fourier(f_values, uv), f_values, uv  
