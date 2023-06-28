@@ -8,8 +8,6 @@ import scipy.fft as ft
 import scipy.constants as spc
 import scipy.interpolate as spinter
 
-import time
-
 def hist_data(data, binsno, pixs = False, num = 0):
     """
     Function that makes a histogram of direct output data from an interferometer object.
@@ -89,6 +87,7 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
         # This lambda function is the formula for an inverse fourier transform, without the integration.
         # It is included here to make clear that a discrete inverse fourier transform is what is happening, and 
         # to make clear what argument means what.
+        # TODO look into Jit & numba
         inverse_fourier = lambda x, y, u, v, fourier: fourier * np.exp(2j * np.pi * (u * x + v * y))
 
         for i, x in np.ndenumerate(re_im):
@@ -127,7 +126,6 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
     edges = np.array([instrument.pos_range[0] + i * instrument.res_pos for i in range(bins + 1)])
     centres = edges[:-1] + (edges[1:] - edges[:-1])/2
 
-    start = time.time()
     # Looking only at the baselines that have associated photons
     for k in np.unique(base_ind):
         # Taking only relevant photons from the current baseline
@@ -177,8 +175,6 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
                     f_values[i+1] = np.conjugate(f_values[i])
 
                     i += 2  
-
-    print(f'Calculating fourier transforms took {time.time() - start:.3f} seconds')
 
     # Doing the final inverse fourier transform, and also returning the pre-ifft data, for visualization and testing.
     return inverse_fourier(f_values, uv), f_values, uv  
