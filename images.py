@@ -134,7 +134,7 @@ def disc(size, alpha, beta, energy, radius, energy_spread=0.):
     for i in range(0, size):
         im.energies[i] = energy * spc.eV * 1e3
         im.toa[i] = i
-        r = (np.random.random() * 2 - 1) * radius
+        r = np.random.random() * radius
         theta = np.random.random() * 2 * np.pi
         im.loc[i] = np.array([alpha + r * np.cos(theta), beta + r * np.sin(theta)]) * 2 * np.pi / (3600 * 360) 
 
@@ -189,3 +189,5 @@ def generate_from_image(image_path, no_photons, img_scale, energy, energy_spread
         photon_img.energies += np.random.normal(0, energy_spread * spc.eV * 1e3, no_photons)
 
     return photon_img, pix_scale
+
+# TODO write a function that adds two (or N) images together

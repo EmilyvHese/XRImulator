@@ -211,7 +211,7 @@ class interferometer():
         self.baselines.append(baseline(D, L, W, F))
 
     def add_willingale_baseline(self, D):
-        self.baselines.append(baseline(D, 10, 300, D/(2*np.tan(6 * np.pi / (3600 * 360)))))
+        self.baselines.append(baseline(D, 10, 300, D/(2*np.tan(6.2 * np.pi / (3600 * 360)))))
 
     def clear_baselines(self):
         self.baselines.clear()
