@@ -18,7 +18,7 @@ class baseline():
     than the detected photons. 
     """
 
-    def __init__(self, D, L, W, F):
+    def __init__(self, D, L, W):
         """ 
         Function that generates a single x-ray interferometer baseline according to given specifications.
         
@@ -33,7 +33,7 @@ class baseline():
         self.D = D
         self.L = L
         self.W = W * 1e-6
-        self.F = F
+        self.F = D * L / self.W
         
 class interferometer():
     """ 
@@ -197,7 +197,7 @@ class interferometer():
 
         return pointing
 
-    def add_baseline(self, D, L, W, F):
+    def add_baseline(self, D, L, W):
         """
         Function that adds a baseline of given parameters to the interferometer object. Call this function multiple times to
         construct a full interferometer capable of actually observing images. Without these, no photons can be measured.
@@ -208,10 +208,10 @@ class interferometer():
         W (float) = incident photon beam width (in micrometers)\n
     	F (float) = effective focal length of interferometer (in meters)\n
         """
-        self.baselines.append(baseline(D, L, W, F))
+        self.baselines.append(baseline(D, L, W))
 
     def add_willingale_baseline(self, D):
-        self.baselines.append(baseline(D, 10, 300, D/(2*np.tan(6 * np.pi / (3600 * 360)))))
+        self.baselines.append(baseline(D, 10, 300))
 
     def clear_baselines(self):
         self.baselines.clear()

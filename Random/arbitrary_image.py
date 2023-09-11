@@ -15,8 +15,8 @@ img_fft = np.fft.fftshift(np.fft.fft2(img))
 
 img_shape = (np.array(img_fft.shape))
 mask = np.zeros(img_shape)
-masked_coords_x = np.array([[y] for x in np.linspace(0, .000000000001 * np.pi, 50) for y in np.linspace(-80, 80, 50)]) + img_shape[0]/2
-masked_coords_y = np.array([[0]  for x in np.linspace(0, .000000000001 * np.pi, 50) for y in np.linspace(-80, 80, 50)]) + img_shape[1]/2
+masked_coords_x = np.array([[y] for x in np.linspace(0, .000000000001 * np.pi, 800) for y in np.linspace(-80, 80, 800)]) + img_shape[0]/2
+masked_coords_y = np.array([[y]  for x in np.linspace(0, .000000000001 * np.pi, 800) for y in np.linspace(-80, 80, 800)]) + img_shape[1]/2
 mask[masked_coords_x.astype(int), masked_coords_y.astype(int)] = 1
 img_fft_masked = img_fft * mask
 

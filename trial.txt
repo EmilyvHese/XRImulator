@@ -1,0 +1,18 @@
+Description of energy precision plots 
+
+Plots showing the importance of energy resolution. The left/top plot shows two separate fringe patterns, with the blue pattern being of 1.2 keV photons, and the orange pattern of 2.4 keV photons. This shows how radically different those
+
+Hmm actually just use the combined plot and refer back to earlier plots to show fringes of just the one energy. So:
+
+Description of energy precision plot 
+
+Plot showing what the fringe pattern would look like if the energy resolution is 
+
+Nevermind that either better idea use the plots with different levels of smear, showing how .1 keV is still fine to resolve the fringes, but how 1.2 keV simply won't do.
+
+Description of energy precision plots
+
+Plots showing the importance of energy resolution, with the left/top plot showing fringes with photons ranging in energy from 1.2-1.3 keV, and the right/bottom plot showing fringes with photons ranging in energy from 1.2-2.4 keV, both along with the expected pmf associated with the energy in the middle of their respective ranges. 
+
+Text about the plots, not the caption:
+It is evident from these plots that current detector technology's energy resolution is sufficient to resolve the fringes with the current setup. At the same time it is also evident that this is not a detector requirement that can easily be compromised on should the opportunity present itself.

@@ -1,5 +1,6 @@
 # print((8.5 * 3 + 8.5 * 6 + (7.5 *3 + 8.5) * 6 + 7 * 3 + 12 * 8.5 + 7.5 * 6 + 8 * 6 + 7.5 * 6) / 66)
 import numpy as np
+import scipy.constants as spc
 
 # test1 = np.array([1,2,3])
 # test2 = np.array([1,2,4])
@@ -24,4 +25,5 @@ import numpy as np
 # test = np.array([True, True, False])
 # print(test.nonzero()[0].size)
 
-print(-5 % 7)
+print(12*1e9 / (3.2 * 1e3 * spc.parsec) * 360 * 3600 / (2*np.pi))
+print(16.77 * 696*1e8 * 1e-11)

@@ -4,7 +4,7 @@ import numpy as np
 x = np.linspace(0, 2, 1000)
 y1 = np.sin(x * 10 * 2 * np.pi)
 y2 = np.sin(x * 2  * 2 * np.pi)
-y3 = np.random.random(x.size) * 10 - 5
+y3 = np.random.random(x.size) * 20 - 10
 y4 = y1 + y2 + y3
 
 fig = plt.figure(figsize=(12,6))
