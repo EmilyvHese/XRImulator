@@ -73,6 +73,20 @@ def image_recon_smooth(data, instrument, point_binsize, fov, test_data=np.zeros(
                                 second and third of which are the fourier transforms and associated uv coordinates of each roll bin + energy channel combination.
     """    
 
+    # Could maybe do this with ffts anyway if you calculated fftfreqs of the to be reconstructed image pixels, and converted these from pixel^-1 to arcsec^-1 using image scale
+    # Something along lines of
+
+    # image = np.zeros(samples)
+    # fft_freqs_u = np.fft.fftfreq(samples[0], samples.max() / fov)
+    # fft_freq_ind_u = np.arange(0, fft_freqs_u.size, 1, dtype=np.int_)
+    # u_conv = spinter.interp1d(fft_freqs_u, fft_freq_ind_u, kind='nearest')
+
+    # fft_freqs_v = np.fft.fftfreq(samples[1], samples.max() / fov)
+    # fft_freq_ind_v = np.arange(0, fft_freqs_v.size, 1, dtype=np.int_)
+    # v_conv = spinter.interp1d(fft_freqs_v, fft_freq_ind_v, kind='nearest')
+
+    # And then put relevant data in those bins
+
     def inverse_fourier(f_values, uv):
         """
         This is a helper function that calculates the inverse fourier transform of the data from all baselines, only to 

@@ -1315,7 +1315,7 @@ def visibility_test_E(no_Ds, no_sims, energy):
     plt.show()
 
 def visibility_test_scale(no_Ds, no_sims, energy):
-    test_I = instrument.interferometer(.01, 1, 2, np.array([1.2, 7]), np.array([-400, 400]), 
+    test_I = instrument.interferometer(.1, 1, 2, np.array([.1, 7]), np.array([-400, 400]), 
                                         0.00, None, instrument.interferometer.smooth_roller, 
                                         .00000 * 2 * np.pi, roll_init=0/4 * np.pi)
     img_scale = .0004
@@ -1323,6 +1323,11 @@ def visibility_test_scale(no_Ds, no_sims, energy):
     image_2 = images.disc(int(1e5), 0, 0, energy, 2 * img_scale / 2)
     image_3 = images.disc(int(1e5), 0, 0, energy, 3 * img_scale / 2)
     image_4 = images.disc(int(1e5), 0, 0, energy, 4 * img_scale / 2)
+
+    # image = images.double_point_source(int(1e6), [0,0], [-img_scale/2, img_scale/2], [energy, energy])
+    # image_2 = images.double_point_source(int(1e6), [0,0], [-img_scale/2 * 2, img_scale/2 * 2], [energy, energy])
+    # image_3 = images.double_point_source(int(1e6), [0,0], [-img_scale/2 * 3, img_scale/2 * 3], [energy, energy])
+    # image_4 = images.double_point_source(int(1e6), [0,0], [-img_scale/2 * 4, img_scale/2 * 4], [energy, energy])
 
     Ds = np.linspace(.005, 1, no_Ds)
 
@@ -1342,9 +1347,11 @@ def visibility_test_scale(no_Ds, no_sims, energy):
             amps = np.zeros((no_sims, 2))
 
             for sim in range(no_sims):
-                test_data = process.interferometer_data(test_I, image, 100000, 2, .1 / (2*np.sqrt(2*np.log(2))))
+                test_data = process.interferometer_data(test_I, image, 100000, 2, .15 / (2*np.sqrt(2*np.log(2))))
+                # test_data = process.interferometer_data(test_I, image, 100000)
 
                 y_data, _ = np.histogram(test_data.pixel_to_pos(test_I), edges)
+                # y_data, _ = np.histogram(test_data.pos, edges)
 
                 amps[sim, 0] = np.abs(np.sum(y_data * np.exp(-2j * np.pi * freq * centres)) / y_data.size)
                 amps[sim, 1] = np.abs(np.sum(y_data) / y_data.size)
@@ -1359,23 +1366,28 @@ def visibility_test_scale(no_Ds, no_sims, energy):
     vis_3 = calc_vis(image_3, Ds)
     vis_4 = calc_vis(image_4, Ds)
 
-    D_theory = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360))
-    D_theory_2 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (2 * img_scale * 2 * np.pi / (3600 * 360))
-    D_theory_3 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (3 * img_scale * 2 * np.pi / (3600 * 360))
-    D_theory_4 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (4 * img_scale * 2 * np.pi / (3600 * 360))
+    # D_theory = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360)) * 1.22 * 2
+    # D_theory_2 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (2 * img_scale * 2 * np.pi / (3600 * 360)) * 1.22 * 2
+    # D_theory_3 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (3 * img_scale * 2 * np.pi / (3600 * 360)) * 1.22 * 2
+    # D_theory_4 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (4 * img_scale * 2 * np.pi / (3600 * 360)) * 1.22 * 2
+
+    # D_theory = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (img_scale * 2 * np.pi / (3600 * 360)) / 2
+    # D_theory_2 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (2 * img_scale * 2 * np.pi / (3600 * 360)) / 2
+    # D_theory_3 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (3 * img_scale * 2 * np.pi / (3600 * 360)) / 2
+    # D_theory_4 = (spc.h * spc.c / (energy * spc.eV * 1e3)) / (4 * img_scale * 2 * np.pi / (3600 * 360)) / 2
 
     plt.errorbar(Ds, vis[:, 0], yerr=vis[:, 1], marker='.', ls='-', label=f'{img_scale*1e6:.1f} $\\mu$as')
-    plt.vlines(D_theory, vis_4[:, 0].min(), vis_4[:, 0].max(), 'b', alpha=.3)
+    # plt.vlines(D_theory, vis_4[:, 0].min(), vis_4[:, 0].max(), 'b', alpha=.3)
     plt.errorbar(Ds, vis_2[:, 0], yerr=vis_2[:, 1], marker= '.', ls='-.', label=f'{2 * img_scale*1e6:.1f} $\\mu$as')
-    plt.vlines(D_theory_2, vis_4[:, 0].min(), vis_4[:, 0].max(), 'orange', alpha=.3)
+    # plt.vlines(D_theory_2, vis_4[:, 0].min(), vis_4[:, 0].max(), 'orange', alpha=.3)
     plt.errorbar(Ds, vis_3[:, 0], yerr=vis_3[:, 1], marker= '.', ls=':', label=f'{3 * img_scale*1e6:.1f} $\\mu$as')
-    plt.vlines(D_theory_3, vis_4[:, 0].min(), vis_4[:, 0].max(), 'g', alpha=.3)
+    # plt.vlines(D_theory_3, vis_4[:, 0].min(), vis_4[:, 0].max(), 'g', alpha=.3)
     plt.errorbar(Ds, vis_4[:, 0], yerr=vis_4[:, 1], marker= '.', ls='--', label=f'{4 * img_scale*1e6:.1f} $\\mu$as')
-    plt.vlines(D_theory_4, vis_4[:, 0].min(), vis_4[:, 0].max(), 'r', alpha=.3)
-    plt.title(f'Mean of {no_sims} observations of uniform discs at variable radii')
+    # plt.vlines(D_theory_4, vis_4[:, 0].min(), vis_4[:, 0].max(), 'r', alpha=.3)
+    plt.title(f'Mean of {no_sims} observations of uniform discs of variable radii')
     plt.xlabel('Baseline length (m)')
     plt.ylabel('Visibility')
-    plt.legend(title='E = 1.2 keV\nFWHM = .1 keV\npixel = 2 $\mu$m')
+    plt.legend(title=f'E = {energy} keV\nFWHM = .15 keV\n$\\delta y$ = 2 $\mu$m')
     plt.ylim(0, 1)
     plt.xlim(0, 1.01)
     plt.show()
@@ -1467,7 +1479,7 @@ if __name__ == "__main__":
     # locate_test(-400e-6, 10, 1e6, 1.2, 1)
     # locate_test_multiple_E(1e-6, 10, 1e6, [1.2, 2.4, 3.6, 4.8, 6], 1, 2, .15 / (2 * np.sqrt(2 * np.log(2))))
     # visibility_test_E(20, 5, 1.2)
-    # visibility_test_scale(20, 5, 1.2)
+    visibility_test_scale(40, 5, 1.2)
     # visibility_test_2(50, 10, 1.2)
     # fringes_plots()
     pass
